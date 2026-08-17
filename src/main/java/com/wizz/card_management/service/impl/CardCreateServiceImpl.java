@@ -10,6 +10,14 @@ import com.wizz.card_management.repository.CardRepository;
 import com.wizz.card_management.repository.IdempotencyRecordRepository;
 import com.wizz.card_management.service.CardCreateService;
 import com.wizz.card_management.util.HashUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
+import java.util.concurrent.ConcurrentHashMap;
+
+
+import java.security.SecureRandom;
 
 import org.springframework.stereotype.Service;
 
@@ -19,6 +27,10 @@ import java.util.UUID;
 @Service
 public class CardCreateServiceImpl implements CardCreateService {
 
+    private static final Logger log = LoggerFactory.getLogger(CardCreateServiceImpl.class);
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final ConcurrentHashMap<String, Object> IDEMPOTENCY_LOCKS = new ConcurrentHashMap<>();
     private final CardRepository cardRepository;
     private final CardProgramRepository cardProgramRepository;
     private final IdempotencyRecordRepository idempotencyRecordRepository;
@@ -33,13 +45,30 @@ public class CardCreateServiceImpl implements CardCreateService {
         this.idempotencyRecordRepository = idempotencyRecordRepository;
     }
 
-    @Override
-    public CreateCardResponse createCard(
-            CreateCardRequest request,
-            String requestId,
-            String idempotencyKey,
-            String channel) {
+        @Transactional
+        @Override
+        public CreateCardResponse createCard(
+                CreateCardRequest request,
+                String requestId,
+                String idempotencyKey,
+                String channel,
+                String partnerId) {
 
+        Object lock = IDEMPOTENCY_LOCKS.computeIfAbsent(
+                idempotencyKey,
+                key -> new Object()
+        );
+
+        synchronized (lock) {
+
+                log.info(
+                        "Creating card requestId={} partnerId={} idempotencyKey={}",
+                        requestId,
+                        partnerId,
+                        idempotencyKey
+                );
+
+       
 
         //  Extract request data
 
@@ -135,9 +164,7 @@ public class CardCreateServiceImpl implements CardCreateService {
         //  Generate card ID
 
 
-        String cardId = String.valueOf(
-                System.currentTimeMillis()
-        );
+        String cardId = UUID.randomUUID().toString();
 
 
         //  Generate demo card number
@@ -146,7 +173,7 @@ public class CardCreateServiceImpl implements CardCreateService {
         String cardNumber = "411111111111" +
                 String.format(
                         "%04d",
-                        (int) (Math.random() * 10000)
+                        SECURE_RANDOM.nextInt(10000)
                 );
 
 
@@ -176,7 +203,7 @@ public class CardCreateServiceImpl implements CardCreateService {
         card.setCardProgramType(programType);
         card.setCardType(cardType);
         card.setCardProgramId(programId);
-        card.setCardNumber(cardNumber);
+        card.setCardNumber(maskedCardNumber);
         card.setExpiryDate(expiryDate);
         card.setCardStatus("A");
 
@@ -185,7 +212,12 @@ public class CardCreateServiceImpl implements CardCreateService {
 
 
         cardRepository.save(card);
-
+        log.info(
+                "Card created successfully requestId={} partnerId={} cardId={}",
+                requestId,
+                partnerId,
+                cardId
+        );
 
         //  Create API response
 
@@ -225,6 +257,7 @@ public class CardCreateServiceImpl implements CardCreateService {
 
 
         return response;
+        }
     }
 
     private CreateCardResponse buildResponseFromRecord(

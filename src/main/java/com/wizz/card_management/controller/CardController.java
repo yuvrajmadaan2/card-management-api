@@ -15,9 +15,12 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import com.wizz.card_management.ratelimit.RateLimitService;
+
 
 @RestController
-@RequestMapping("/cards")
+@RequestMapping("/v1/cards")
 @Tag(
         name = "Card API",
         description = "Card management APIs"
@@ -25,10 +28,15 @@ import org.springframework.web.bind.annotation.*;
 public class CardController {
 
     private final CardCreateService cardCreateService;
+    private final RateLimitService rateLimitService;
 
-    public CardController(CardCreateService cardCreateService) {
+        public CardController(
+                CardCreateService cardCreateService,
+                RateLimitService rateLimitService) {
+
         this.cardCreateService = cardCreateService;
-    }
+        this.rateLimitService = rateLimitService;
+        }
 
     @Operation(
             summary = "Create card",
@@ -55,9 +63,7 @@ public class CardController {
             @RequestBody
             CreateCardRequest request,
 
-            @Parameter(description = "Bearer access token")
-            @RequestHeader("Authorization")
-            String authorization,
+
 
             @Parameter(description = "Unique request ID")
             @RequestHeader("X-Request-Id")
@@ -72,7 +78,19 @@ public class CardController {
                     value = "X-Channel",
                     required = false
             )
-            String channel) {
+            String channel,
+            JwtAuthenticationToken authentication) {
+        String partnerId = authentication
+                .getToken()
+                .getAudience()
+                .stream()
+                .findFirst()
+                .orElse("unknown");
+        if (!rateLimitService.isAllowed(partnerId)) {
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .build();
+        }                
 
         try {
 
@@ -81,7 +99,8 @@ public class CardController {
                             request,
                             requestId,
                             idempotencyKey,
-                            channel
+                            channel,
+                            partnerId
                     );
 
             return ResponseEntity.ok(response);
