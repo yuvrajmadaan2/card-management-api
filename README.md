@@ -25,7 +25,7 @@ The production deployment must ensure that:
 
 ## Local Development
 
-For local development, the application can run with the `local`
+For local development, run the application with the `local`
 Spring profile:
 
 ```text
