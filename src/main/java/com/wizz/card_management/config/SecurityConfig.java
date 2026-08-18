@@ -85,6 +85,14 @@ public class SecurityConfig {
             }
 
             response.setStatus(401);
+            response.setContentType("application/json");
+
+            String json =
+                    "{\"referenceId\":\"" +
+                    requestId +
+                    "\",\"responseCode\":\"98\",\"responseDesc\":\"Unauthorized\"}";
+
+            response.getWriter().write(json);
         };
     }
 
@@ -104,6 +112,14 @@ public class SecurityConfig {
             }
 
             response.setStatus(403);
+            response.setContentType("application/json");
+
+            String json =
+                    "{\"referenceId\":\"" +
+                    requestId +
+                    "\",\"responseCode\":\"98\",\"responseDesc\":\"Forbidden\"}";
+
+            response.getWriter().write(json);
         };
     }
 

@@ -35,5 +35,5 @@ build/
 # Environment / secrets
 .env
 *.env
-application-local.properties
+
 application-local.yml
