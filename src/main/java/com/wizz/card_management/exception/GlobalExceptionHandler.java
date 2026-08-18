@@ -1,15 +1,16 @@
 package com.wizz.card_management.exception;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.stream.Collectors;
 
@@ -40,6 +41,32 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .header("X-Request-Id", requestId)
                 .body(response);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestHeader(
+            MissingRequestHeaderException exception,
+            HttpServletRequest request) {
+
+        String requestId = request.getHeader("X-Request-Id");
+
+        String message =
+                exception.getHeaderName() + " header is required";
+
+        ErrorResponse response = new ErrorResponse(
+                requestId,
+                "01",
+                message
+        );
+
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.status(HttpStatus.BAD_REQUEST);
+
+        if (requestId != null && !requestId.isBlank()) {
+            builder.header("X-Request-Id", requestId);
+        }
+
+        return builder.body(response);
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)
