@@ -7,6 +7,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -68,6 +70,44 @@ public class SecurityConfig {
     }
 
     @Bean
+    public AuthenticationEntryPoint authenticationEntryPoint() {
+
+        return (request, response, authenticationException) -> {
+
+            String requestId =
+                    request.getHeader("X-Request-Id");
+
+            if (requestId != null && !requestId.isBlank()) {
+                response.setHeader(
+                        "X-Request-Id",
+                        requestId
+                );
+            }
+
+            response.setStatus(401);
+        };
+    }
+
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+
+        return (request, response, accessDeniedException) -> {
+
+            String requestId =
+                    request.getHeader("X-Request-Id");
+
+            if (requestId != null && !requestId.isBlank()) {
+                response.setHeader(
+                        "X-Request-Id",
+                        requestId
+                );
+            }
+
+            response.setStatus(403);
+        };
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http) throws Exception {
 
@@ -109,6 +149,16 @@ public class SecurityConfig {
 
                         .anyRequest()
                         .authenticated()
+                )
+
+                .exceptionHandling(exceptionHandling ->
+                        exceptionHandling
+                                .authenticationEntryPoint(
+                                        authenticationEntryPoint()
+                                )
+                                .accessDeniedHandler(
+                                        accessDeniedHandler()
+                                )
                 )
 
                 .oauth2ResourceServer(oauth2 ->
