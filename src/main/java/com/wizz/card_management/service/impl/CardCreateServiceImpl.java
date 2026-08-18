@@ -5,22 +5,19 @@ import com.wizz.card_management.dto.response.CreateCardResponse;
 import com.wizz.card_management.entity.Card;
 import com.wizz.card_management.entity.CardProgram;
 import com.wizz.card_management.entity.IdempotencyRecord;
+import com.wizz.card_management.exception.IdempotencyConflictException;
 import com.wizz.card_management.repository.CardProgramRepository;
 import com.wizz.card_management.repository.CardRepository;
 import com.wizz.card_management.repository.IdempotencyRecordRepository;
 import com.wizz.card_management.service.CardCreateService;
 import com.wizz.card_management.util.HashUtil;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.dao.DataIntegrityViolationException;
-import java.util.concurrent.ConcurrentHashMap;
-
 
 import java.security.SecureRandom;
-
-import org.springframework.stereotype.Service;
-
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,7 +27,6 @@ public class CardCreateServiceImpl implements CardCreateService {
     private static final Logger log = LoggerFactory.getLogger(CardCreateServiceImpl.class);
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-    private static final ConcurrentHashMap<String, Object> IDEMPOTENCY_LOCKS = new ConcurrentHashMap<>();
     private final CardRepository cardRepository;
     private final CardProgramRepository cardProgramRepository;
     private final IdempotencyRecordRepository idempotencyRecordRepository;
@@ -54,12 +50,7 @@ public class CardCreateServiceImpl implements CardCreateService {
                 String channel,
                 String partnerId) {
 
-        Object lock = IDEMPOTENCY_LOCKS.computeIfAbsent(
-                idempotencyKey,
-                key -> new Object()
-        );
 
-        synchronized (lock) {
 
                 log.info(
                         "Creating card requestId={} partnerId={} idempotencyKey={}",
@@ -102,9 +93,7 @@ public class CardCreateServiceImpl implements CardCreateService {
 
             // Same key + different request = conflict
             if (!record.getRequestHash().equals(requestHash)) {
-                throw new IllegalStateException(
-                        "IDEMPOTENCY_CONFLICT"
-                );
+                throw new IdempotencyConflictException();
             }
 
             // Same key + same request = replay
@@ -257,7 +246,7 @@ public class CardCreateServiceImpl implements CardCreateService {
 
 
         return response;
-        }
+        
     }
 
     private CreateCardResponse buildResponseFromRecord(

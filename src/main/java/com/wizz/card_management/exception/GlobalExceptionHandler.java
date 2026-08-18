@@ -23,12 +23,26 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
 
         ErrorResponse response = new ErrorResponse(
-                "400",
+                "01",
                 message
         );
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .body(response);
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<ErrorResponse> handleIdempotencyConflict(
+            IdempotencyConflictException exception) {
+
+        ErrorResponse response = new ErrorResponse(
+                "409",
+                "Idempotency key conflict"
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
                 .body(response);
     }
 

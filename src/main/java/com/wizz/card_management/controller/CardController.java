@@ -82,48 +82,26 @@ public class CardController {
             JwtAuthenticationToken authentication) {
         String partnerId = authentication
                 .getToken()
-                .getAudience()
-                .stream()
-                .findFirst()
-                .orElse("unknown");
+                .getSubject();
         if (!rateLimitService.isAllowed(partnerId)) {
         return ResponseEntity
                 .status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("X-Request-Id", requestId)
                 .build();
         }                
 
-        try {
-
-            CreateCardResponse response =
-                    cardCreateService.createCard(
-                            request,
-                            requestId,
-                            idempotencyKey,
-                            channel,
-                            partnerId
-                    );
-
-            return ResponseEntity.ok(response);
-
-        } catch (IllegalStateException e) {
-
-            if ("IDEMPOTENCY_CONFLICT".equals(e.getMessage())) {
-
-                CreateCardResponse response =
-                        new CreateCardResponse();
-
-                response.setReferenceId(requestId);
-                response.setResponseCode("409");
-                response.setResponseDesc(
-                        "Idempotency key conflict"
+        CreateCardResponse response =
+                cardCreateService.createCard(
+                        request,
+                        requestId,
+                        idempotencyKey,
+                        channel,
+                        partnerId
                 );
 
-                return ResponseEntity
-                        .status(HttpStatus.CONFLICT)
-                        .body(response);
-            }
-
-            throw e;
-        }
+        return ResponseEntity
+                .ok()
+                .header("X-Request-Id", requestId)
+                .body(response);
     }
 }

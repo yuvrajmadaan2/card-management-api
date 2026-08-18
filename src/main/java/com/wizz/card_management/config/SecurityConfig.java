@@ -2,12 +2,70 @@ package com.wizz.card_management.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+
+        CorsConfiguration config = new CorsConfiguration();
+
+        config.setAllowedOrigins(
+                List.of("https://portal.partner-forex.com")
+        );
+
+        config.setAllowedMethods(
+                List.of("POST", "OPTIONS")
+        );
+
+        config.setAllowedHeaders(
+                List.of(
+                        "Authorization",
+                        "Content-Type",
+                        "X-Request-Id",
+                        "X-Idempotency-Key",
+                        "X-Channel"
+                )
+        );
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
+        source.registerCorsConfiguration("/**", config);
+
+        return source;
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+
+        JwtGrantedAuthoritiesConverter authoritiesConverter =
+                new JwtGrantedAuthoritiesConverter();
+
+        authoritiesConverter.setAuthoritiesClaimName("groups");
+        authoritiesConverter.setAuthorityPrefix("SCOPE_");
+
+        JwtAuthenticationConverter converter =
+                new JwtAuthenticationConverter();
+
+        converter.setJwtGrantedAuthoritiesConverter(
+                authoritiesConverter
+        );
+
+        return converter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -15,6 +73,20 @@ public class SecurityConfig {
 
         http
                 .csrf(csrf -> csrf.disable())
+
+                .cors(cors ->
+                        cors.configurationSource(
+                                corsConfigurationSource()
+                        )
+                )
+
+                .headers(headers ->
+                        headers.httpStrictTransportSecurity(hsts ->
+                                hsts
+                                        .includeSubDomains(true)
+                                        .maxAgeInSeconds(31536000)
+                        )
+                )
 
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
@@ -25,20 +97,26 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         .requestMatchers(
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**"
+                                "/h2-console/**"
                         )
                         .permitAll()
 
-                        .requestMatchers("/v1/cards")
-                        .authenticated()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/cards"
+                        )
+                        .hasAuthority("SCOPE_cards:write")
 
                         .anyRequest()
                         .authenticated()
                 )
 
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt -> {})
+                        oauth2.jwt(jwt ->
+                                jwt.jwtAuthenticationConverter(
+                                        jwtAuthenticationConverter()
+                                )
+                        )
                 );
 
         return http.build();
