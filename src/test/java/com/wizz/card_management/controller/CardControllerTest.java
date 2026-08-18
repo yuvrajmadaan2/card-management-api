@@ -1,6 +1,5 @@
 package com.wizz.card_management.controller;
 
-import com.wizz.card_management.config.SecurityConfig;
 import com.wizz.card_management.dto.request.CreateCardRequest;
 import com.wizz.card_management.dto.response.CreateCardResponse;
 import com.wizz.card_management.ratelimit.RateLimitService;
@@ -29,12 +28,10 @@ import static org.mockito.Mockito.*;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.TestPropertySource;
+
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.web.OAuth2ResourceServerWebSecurityAutoConfiguration;
-
 
 
 @WebMvcTest(CardController.class)
@@ -43,7 +40,6 @@ import org.springframework.boot.security.oauth2.server.resource.autoconfigure.we
         OAuth2ResourceServerAutoConfiguration.class,
         OAuth2ResourceServerWebSecurityAutoConfiguration.class
 })
-
 class CardControllerTest {
 
     @Autowired
@@ -54,7 +50,6 @@ class CardControllerTest {
 
     @MockitoBean
     private RateLimitService rateLimitService;
-
 
 
     private JwtAuthenticationToken authenticationWithScope() {
@@ -80,6 +75,7 @@ class CardControllerTest {
         );
     }
 
+
     private String validJson() {
 
         return """
@@ -92,6 +88,7 @@ class CardControllerTest {
                 }
                 """;
     }
+
 
     @Test
     void validRequest_shouldReturn200() throws Exception {
@@ -122,10 +119,10 @@ class CardControllerTest {
         mockMvc.perform(
                         post("/v1/cards")
                                 .with(request -> {
-                                request.setUserPrincipal(
-                                        authenticationWithScope()
-                                );
-                                return request;
+                                    request.setUserPrincipal(
+                                            authenticationWithScope()
+                                    );
+                                    return request;
                                 })
                                 .header(
                                         "X-Request-Id",
@@ -166,6 +163,7 @@ class CardControllerTest {
         );
     }
 
+
     @Test
     void missingRequiredField_shouldReturn400()
             throws Exception {
@@ -185,10 +183,10 @@ class CardControllerTest {
         mockMvc.perform(
                         post("/v1/cards")
                                 .with(request -> {
-                                request.setUserPrincipal(
-                                        authenticationWithScope()
-                                );
-                                return request;
+                                    request.setUserPrincipal(
+                                            authenticationWithScope()
+                                    );
+                                    return request;
                                 })
                                 .header(
                                         "X-Request-Id",
@@ -244,10 +242,10 @@ class CardControllerTest {
         mockMvc.perform(
                         post("/v1/cards")
                                 .with(request -> {
-                                request.setUserPrincipal(
-                                        authenticationWithScope()
-                                );
-                                return request;
+                                    request.setUserPrincipal(
+                                            authenticationWithScope()
+                                    );
+                                    return request;
                                 })
                                 .header(
                                         "X-Request-Id",
@@ -267,9 +265,20 @@ class CardControllerTest {
                 )
                 .andExpect(
                         jsonPath("$.responseCode")
-                                .value("409")
+                                .value("09")
+                )
+                .andExpect(
+                        jsonPath("$.referenceId")
+                                .value("REQ-004")
+                )
+                .andExpect(
+                        header().string(
+                                "X-Request-Id",
+                                "REQ-004"
+                        )
                 );
     }
+
 
     @Test
     void rateLimitExceeded_shouldReturn429()
@@ -281,10 +290,10 @@ class CardControllerTest {
         mockMvc.perform(
                         post("/v1/cards")
                                 .with(request -> {
-                                request.setUserPrincipal(
-                                        authenticationWithScope()
-                                );
-                                return request;
+                                    request.setUserPrincipal(
+                                            authenticationWithScope()
+                                    );
+                                    return request;
                                 })
                                 .header(
                                         "X-Request-Id",
@@ -307,6 +316,111 @@ class CardControllerTest {
                                 "X-Request-Id",
                                 "REQ-005"
                         )
+                );
+
+        verifyNoInteractions(cardCreateService);
+    }
+
+
+    @Test
+    void createCard_missingRequestId_shouldReturn400()
+            throws Exception {
+
+        mockMvc.perform(
+                        post("/v1/cards")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authenticationWithScope()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Idempotency-Key",
+                                        "KEY-MISSING-REQUEST-ID"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(validJson())
+                )
+                .andExpect(
+                        status().isBadRequest()
+                );
+
+        verifyNoInteractions(cardCreateService);
+    }
+
+
+    @Test
+    void createCard_missingIdempotencyKey_shouldReturn400()
+            throws Exception {
+
+        mockMvc.perform(
+                        post("/v1/cards")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authenticationWithScope()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-MISSING-IDEMPOTENCY"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(validJson())
+                )
+                .andExpect(
+                        status().isBadRequest()
+                );
+
+        verifyNoInteractions(cardCreateService);
+    }
+
+
+    @Test
+    void createCard_invalidCardProgramType_shouldReturn400()
+            throws Exception {
+
+        String invalidJson = """
+                {
+                  "card": {
+                    "cardProgramType": "X",
+                    "cardType": "V",
+                    "cardProgramId": "PROGRAM-001"
+                  }
+                }
+                """;
+
+        mockMvc.perform(
+                        post("/v1/cards")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authenticationWithScope()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-INVALID-TYPE"
+                                )
+                                .header(
+                                        "X-Idempotency-Key",
+                                        "KEY-INVALID-TYPE"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(invalidJson)
+                )
+                .andExpect(
+                        status().isBadRequest()
+                )
+                .andExpect(
+                        jsonPath("$.responseCode")
+                                .value("01")
                 );
 
         verifyNoInteractions(cardCreateService);
