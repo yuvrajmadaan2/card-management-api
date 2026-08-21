@@ -50,6 +50,11 @@ class CardDetailsReadServiceImplTest {
         card.setExpiryDate("07/2031");
         card.setCardStatus("A");
 
+        // API 2 customer/card details
+        card.setNameOnCard("Chuck Yeager");
+        card.setCustomerId("0012342");
+        card.setIssuedDate("2026-07-07");
+
         cardProgram = new CardProgram();
 
         cardProgram.setProgramId("PRGM001");
@@ -62,7 +67,10 @@ class CardDetailsReadServiceImplTest {
     void getCardDetails_success_returnsCardDetails() {
 
         CardDetailsRequest request =
-                createRequest("CARD001");
+                createRequest(
+                        "CARD001",
+                        "0012342"
+                );
 
         when(cardRepository.findByCardId("CARD001"))
                 .thenReturn(Optional.of(card));
@@ -148,6 +156,21 @@ class CardDetailsReadServiceImplTest {
                 detail.getCardStatusDesc()
         );
 
+        assertEquals(
+                "Chuck Yeager",
+                detail.getNameOnCard()
+        );
+
+        assertEquals(
+                "0012342",
+                detail.getCustomerId()
+        );
+
+        assertEquals(
+                "2026-07-07",
+                detail.getIssuedDate()
+        );
+
         verify(
                 cardRepository,
                 times(1)
@@ -163,7 +186,10 @@ class CardDetailsReadServiceImplTest {
     void getCardDetails_cardNotFound_returnsBusinessDecline() {
 
         CardDetailsRequest request =
-                createRequest("UNKNOWN");
+                createRequest(
+                        "UNKNOWN",
+                        "0012342"
+                );
 
         when(cardRepository.findByCardId("UNKNOWN"))
                 .thenReturn(Optional.empty());
@@ -213,7 +239,8 @@ class CardDetailsReadServiceImplTest {
         CardDetailsRequest request =
                 createRequest(
                         "CARD001",
-                        "CARD001"
+                        "CARD001",
+                        "0012342"
                 );
 
         when(cardRepository.findByCardId("CARD001"))
@@ -259,7 +286,8 @@ class CardDetailsReadServiceImplTest {
         CardDetailsRequest request =
                 createRequest(
                         "CARD001",
-                        "UNKNOWN"
+                        "UNKNOWN",
+                        "0012342"
                 );
 
         when(cardRepository.findByCardId("CARD001"))
@@ -307,26 +335,197 @@ class CardDetailsReadServiceImplTest {
         ).findByCardId("UNKNOWN");
     }
 
+    @Test
+    void getCardDetails_ownershipMismatch_returns90() {
+
+        CardDetailsRequest request =
+                createRequest(
+                        "CARD001",
+                        "9999999"
+                );
+
+        when(cardRepository.findByCardId("CARD001"))
+                .thenReturn(Optional.of(card));
+
+        CardDetailsResponse response =
+                service.getCardDetails(
+                        request,
+                        "REQ005",
+                        "PARTNER",
+                        "partner-forex-uk"
+                );
+
+        assertEquals(
+                "REQ005",
+                response.getReferenceId()
+        );
+
+        assertEquals(
+                "90",
+                response.getResponseCode()
+        );
+
+        assertEquals(
+                "Customer–card ownership mismatch — details request declined",
+                response.getResponseDesc()
+        );
+
+        assertNotNull(response.getCards());
+
+        assertTrue(
+                response.getCards().isEmpty()
+        );
+
+        verify(
+                cardRepository,
+                times(1)
+        ).findByCardId("CARD001");
+
+        verifyNoInteractions(
+                cardProgramRepository
+        );
+    }
+
+    @Test
+    void getCardDetails_withoutCustomerId_returnsCardDetails() {
+
+        CardDetailsRequest request =
+                createRequest("CARD001");
+
+        when(cardRepository.findByCardId("CARD001"))
+                .thenReturn(Optional.of(card));
+
+        when(cardProgramRepository.findByProgramId("PRGM001"))
+                .thenReturn(Optional.of(cardProgram));
+
+        CardDetailsResponse response =
+                service.getCardDetails(
+                        request,
+                        "REQ006",
+                        "PARTNER",
+                        "partner-forex-uk"
+                );
+
+        assertEquals(
+                "00",
+                response.getResponseCode()
+        );
+
+        assertEquals(
+                1,
+                response.getCards().size()
+        );
+
+        assertEquals(
+                "0012342",
+                response.getCards()
+                        .get(0)
+                        .getCustomerId()
+        );
+    }
+
+    @Test
+    void getCardDetails_repositoryException_propagatesException() {
+
+        CardDetailsRequest request =
+                createRequest(
+                        "CARD001",
+                        "0012342"
+                );
+
+        when(cardRepository.findByCardId("CARD001"))
+                .thenThrow(
+                        new RuntimeException(
+                                "Database unavailable"
+                        )
+                );
+
+        RuntimeException exception =
+                assertThrows(
+                        RuntimeException.class,
+                        () -> service.getCardDetails(
+                                request,
+                                "REQ007",
+                                "PARTNER",
+                                "partner-forex-uk"
+                        )
+                );
+
+        assertEquals(
+                "Database unavailable",
+                exception.getMessage()
+        );
+
+        verify(
+                cardRepository,
+                times(1)
+        ).findByCardId("CARD001");
+
+        verifyNoInteractions(
+                cardProgramRepository
+        );
+    }
+
     private CardDetailsRequest createRequest(
-            String... cardIds) {
+            String cardId) {
+
+        return createRequest(
+                cardId,
+                null
+        );
+    }
+
+    private CardDetailsRequest createRequest(
+            String cardId,
+            String customerId) {
+
+        CardDetailsRequest request =
+                new CardDetailsRequest();
+
+        CardDetailsRequest.CardRef ref =
+                new CardDetailsRequest.CardRef();
+
+        ref.setCardId(cardId);
+
+        request.setCards(
+                List.of(ref)
+        );
+
+        request.setCustomerId(
+                customerId
+        );
+
+        return request;
+    }
+
+    private CardDetailsRequest createRequest(
+            String firstCardId,
+            String secondCardId,
+            String customerId) {
 
         CardDetailsRequest request =
                 new CardDetailsRequest();
 
         List<CardDetailsRequest.CardRef> cards =
-                Arrays.stream(cardIds)
-                        .map(cardId -> {
+                Arrays.stream(
+                        new String[]{
+                                firstCardId,
+                                secondCardId
+                        }
+                )
+                .map(cardId -> {
 
-                            CardDetailsRequest.CardRef ref =
-                                    new CardDetailsRequest.CardRef();
+                    CardDetailsRequest.CardRef ref =
+                            new CardDetailsRequest.CardRef();
 
-                            ref.setCardId(cardId);
+                    ref.setCardId(cardId);
 
-                            return ref;
-                        })
-                        .toList();
+                    return ref;
+                })
+                .toList();
 
         request.setCards(cards);
+        request.setCustomerId(customerId);
 
         return request;
     }

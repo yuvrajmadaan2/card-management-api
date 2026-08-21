@@ -62,11 +62,15 @@ public class CardDetailsReadServiceImpl
 
         Set<String> uniqueCardIds = new HashSet<>();
 
+        String requestedCustomerId =
+                request.getCustomerId();
+
         for (CardDetailsRequest.CardRef cardRef :
                 request.getCards()) {
 
             String cardId = cardRef.getCardId();
 
+            // De-duplicate card IDs
             if (!uniqueCardIds.add(cardId)) {
                 continue;
             }
@@ -74,6 +78,7 @@ public class CardDetailsReadServiceImpl
             Optional<Card> cardOptional =
                     cardRepository.findByCardId(cardId);
 
+            // Card does not exist
             if (cardOptional.isEmpty()) {
 
                 log.info(
@@ -87,32 +92,80 @@ public class CardDetailsReadServiceImpl
 
             Card card = cardOptional.get();
 
+            /*
+             * Ownership check.
+             *
+             * customerId is conditional according to the API
+             * specification, so we only perform this check when
+             * customerId is supplied in the request.
+             */
+            if (requestedCustomerId != null
+                    && !requestedCustomerId.isBlank()
+                    && !requestedCustomerId.equals(
+                            card.getCustomerId())) {
+
+                log.info(
+                        "Customer-card ownership mismatch requestId={} cardId={}",
+                        requestId,
+                        cardId
+                );
+
+                response.setResponseCode("90");
+                response.setResponseDesc(
+                        "Customer–card ownership mismatch — details request declined"
+                );
+                response.setCards(new ArrayList<>());
+
+                return response;
+            }
+
             CardDetailsResponse.CardDetail detail =
                     new CardDetailsResponse.CardDetail();
 
-            detail.setCardId(card.getCardId());
+            detail.setCardId(
+                    card.getCardId()
+            );
+
             detail.setCardProgramType(
                     card.getCardProgramType()
             );
+
             detail.setCardType(
                     card.getCardType()
             );
+
             detail.setCardProgramId(
                     card.getCardProgramId()
             );
+
             detail.setCardNumber(
                     card.getCardNumber()
             );
+
             detail.setExpiryDate(
                     card.getExpiryDate()
             );
+
             detail.setCardStatus(
                     card.getCardStatus()
             );
+
             detail.setCardStatusDesc(
                     getCardStatusDescription(
                             card.getCardStatus()
                     )
+            );
+
+            detail.setNameOnCard(
+                    card.getNameOnCard()
+            );
+
+            detail.setCustomerId(
+                    card.getCustomerId()
+            );
+
+            detail.setIssuedDate(
+                    card.getIssuedDate()
             );
 
             Optional<CardProgram> programOptional =
@@ -131,6 +184,9 @@ public class CardDetailsReadServiceImpl
 
         response.setCards(cardDetails);
 
+        /*
+         * No requested cards could be resolved.
+         */
         if (cardDetails.isEmpty()) {
 
             response.setResponseCode("10");
@@ -141,6 +197,11 @@ public class CardDetailsReadServiceImpl
             return response;
         }
 
+        /*
+         * At least one card was found.
+         * This also supports partial success when some
+         * requested card IDs are unknown.
+         */
         response.setResponseCode("00");
         response.setResponseDesc(
                 "Card details retrieved successfully"

@@ -1,7 +1,10 @@
 package com.wizz.card_management.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.util.List;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class CardDetailsResponse {
 
     private String referenceId;
@@ -52,6 +55,9 @@ public class CardDetailsResponse {
         private String expiryDate;
         private String cardStatus;
         private String cardStatusDesc;
+        private String nameOnCard;
+        private String customerId;
+        private String issuedDate;
 
         public String getCardId() {
             return cardId;
@@ -123,6 +129,30 @@ public class CardDetailsResponse {
 
         public void setCardStatusDesc(String cardStatusDesc) {
             this.cardStatusDesc = cardStatusDesc;
+        }
+
+        public String getNameOnCard() {
+            return nameOnCard;
+        }
+
+        public void setNameOnCard(String nameOnCard) {
+            this.nameOnCard = nameOnCard;
+        }
+
+        public String getCustomerId() {
+            return customerId;
+        }
+
+        public void setCustomerId(String customerId) {
+            this.customerId = customerId;
+        }
+
+        public String getIssuedDate() {
+            return issuedDate;
+        }
+
+        public void setIssuedDate(String issuedDate) {
+            this.issuedDate = issuedDate;
         }
     }
 }

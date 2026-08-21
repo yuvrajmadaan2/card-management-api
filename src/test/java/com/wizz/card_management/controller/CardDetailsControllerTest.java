@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -83,6 +82,21 @@ class CardDetailsControllerTest {
                       "cardId": "CARD001"
                     }
                   ]
+                }
+                """;
+    }
+
+
+    private String validJsonWithCustomerId() {
+
+        return """
+                {
+                  "cards": [
+                    {
+                      "cardId": "CARD001"
+                    }
+                  ],
+                  "customerId": "0012342"
                 }
                 """;
     }
@@ -339,5 +353,151 @@ class CardDetailsControllerTest {
         verifyNoInteractions(
                 cardDetailsReadService
         );
+    }
+
+
+    @Test
+    void ownershipMismatch_shouldReturn200WithBusinessDecline()
+            throws Exception {
+
+        CardDetailsResponse response =
+                new CardDetailsResponse();
+
+        response.setReferenceId("REQ-005");
+        response.setResponseCode("90");
+        response.setResponseDesc(
+                "Customer–card ownership mismatch — details request declined"
+        );
+        response.setCards(List.of());
+
+        when(rateLimitService.isAllowed("partner-001"))
+                .thenReturn(true);
+
+        when(cardDetailsReadService.getCardDetails(
+                any(),
+                eq("REQ-005"),
+                eq("WEB"),
+                eq("partner-001")
+        )).thenReturn(response);
+
+
+        mockMvc.perform(
+                        post("/cards/details")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authentication()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-005"
+                                )
+                                .header(
+                                        "X-Channel",
+                                        "WEB"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(
+                                        validJsonWithCustomerId()
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        header().string(
+                                "X-Request-Id",
+                                "REQ-005"
+                        )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.responseCode"
+                        ).value("90")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.responseDesc"
+                        ).value(
+                                "Customer–card ownership mismatch — details request declined"
+                        )
+                );
+    }
+
+
+    @Test
+    void partialSuccess_shouldReturn200WithFoundCards()
+            throws Exception {
+
+        CardDetailsResponse response =
+                new CardDetailsResponse();
+
+        response.setReferenceId("REQ-006");
+        response.setResponseCode("00");
+        response.setResponseDesc(
+                "Card details retrieved successfully"
+        );
+
+        CardDetailsResponse.CardDetail detail =
+                new CardDetailsResponse.CardDetail();
+
+        detail.setCardId("CARD001");
+        detail.setCustomerId("0012342");
+        detail.setNameOnCard("Chuck Yeager");
+        detail.setIssuedDate("2026-07-07");
+
+        response.setCards(List.of(detail));
+
+        when(rateLimitService.isAllowed("partner-001"))
+                .thenReturn(true);
+
+        when(cardDetailsReadService.getCardDetails(
+                any(),
+                eq("REQ-006"),
+                eq("WEB"),
+                eq("partner-001")
+        )).thenReturn(response);
+
+
+        mockMvc.perform(
+                        post("/cards/details")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authentication()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-006"
+                                )
+                                .header(
+                                        "X-Channel",
+                                        "WEB"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(
+                                        validJsonWithCustomerId()
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath(
+                                "$.responseCode"
+                        ).value("00")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.cards[0].cardId"
+                        ).value("CARD001")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.cards[0].customerId"
+                        ).value("0012342")
+                );
     }
 }
