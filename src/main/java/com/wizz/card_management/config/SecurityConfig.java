@@ -163,6 +163,12 @@ public class SecurityConfig {
                         )
                         .hasAuthority("SCOPE_cards:write")
 
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/cards/details"
+                        )
+                        .authenticated()
+
                         .anyRequest()
                         .authenticated()
                 )
