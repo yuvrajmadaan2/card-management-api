@@ -106,7 +106,28 @@ public class GlobalExceptionHandler {
                 .header("X-Request-Id", requestId)
                 .body(response);
     }
+        @ExceptionHandler(Exception.class)
+        public ResponseEntity<ErrorResponse> handleInternalException(
+                Exception exception,
+                HttpServletRequest request) {
 
+        String requestId = request.getHeader("X-Request-Id");
+
+        ErrorResponse response = new ErrorResponse(
+                requestId,
+                "99",
+                "Internal server error"
+        );
+
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR);
+
+        if (requestId != null && !requestId.isBlank()) {
+                builder.header("X-Request-Id", requestId);
+        }
+
+        return builder.body(response);
+        }
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ErrorResponse {
 

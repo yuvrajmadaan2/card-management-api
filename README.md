@@ -33,7 +33,7 @@ The endpoint requires the `cards:write` scope.
 
 ### Card Details
 
-POST /cards/details
+POST /v1/cards/details
 
 Required headers:
 

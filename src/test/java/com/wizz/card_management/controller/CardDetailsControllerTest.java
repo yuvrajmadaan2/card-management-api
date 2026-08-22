@@ -126,7 +126,7 @@ class CardDetailsControllerTest {
 
 
         mockMvc.perform(
-                        post("/cards/details")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
                                             authentication()
@@ -199,7 +199,7 @@ class CardDetailsControllerTest {
 
 
         mockMvc.perform(
-                        post("/cards/details")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
                                             authentication()
@@ -250,7 +250,7 @@ class CardDetailsControllerTest {
 
 
         mockMvc.perform(
-                        post("/cards/details")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
                                             authentication()
@@ -289,7 +289,7 @@ class CardDetailsControllerTest {
 
 
         mockMvc.perform(
-                        post("/cards/details")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
                                             authentication()
@@ -330,7 +330,7 @@ class CardDetailsControllerTest {
             throws Exception {
 
         mockMvc.perform(
-                        post("/cards/details")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
                                             authentication()
@@ -382,7 +382,7 @@ class CardDetailsControllerTest {
 
 
         mockMvc.perform(
-                        post("/cards/details")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
                                             authentication()
@@ -461,7 +461,7 @@ class CardDetailsControllerTest {
 
 
         mockMvc.perform(
-                        post("/cards/details")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
                                             authentication()
@@ -498,6 +498,68 @@ class CardDetailsControllerTest {
                         jsonPath(
                                 "$.cards[0].customerId"
                         ).value("0012342")
+                );
+    }
+
+    @Test
+    void internalException_shouldReturn500() throws Exception {
+
+        when(rateLimitService.isAllowed("partner-001"))
+                .thenReturn(true);
+
+        when(cardDetailsReadService.getCardDetails(
+                any(),
+                eq("REQ-007"),
+                eq("WEB"),
+                eq("partner-001")
+        )).thenThrow(
+                new RuntimeException("Database unavailable")
+        );
+
+        mockMvc.perform(
+                        post("/v1/cards/details")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authentication()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-007"
+                                )
+                                .header(
+                                        "X-Channel",
+                                        "WEB"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(validJsonWithCustomerId())
+                )
+                .andExpect(
+                        status().isInternalServerError()
+                )
+                .andExpect(
+                        header().string(
+                                "X-Request-Id",
+                                "REQ-007"
+                        )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.referenceId"
+                        ).value("REQ-007")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.responseCode"
+                        ).value("99")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.responseDesc"
+                        ).value("Internal server error")
                 );
     }
 }
