@@ -165,7 +165,13 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/cards/details"
+                                "/v1/cards/details"
+                        )
+                        .authenticated()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/cards/setStatus"
                         )
                         .authenticated()
 
