@@ -175,6 +175,12 @@ public class SecurityConfig {
                         )
                         .authenticated()
 
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/txnControls"
+                        )
+                        .authenticated()
+                        
                         .anyRequest()
                         .authenticated()
                 )
