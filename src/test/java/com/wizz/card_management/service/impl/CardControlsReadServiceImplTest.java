@@ -3,6 +3,7 @@ package com.wizz.card_management.service.impl;
 import com.wizz.card_management.dto.request.TxnControlsFetchRequest;
 import com.wizz.card_management.dto.response.TxnControlsFetchResponse;
 import com.wizz.card_management.entity.Card;
+import com.wizz.card_management.entity.TransactionControl;
 import com.wizz.card_management.repository.CardProgramRepository;
 import com.wizz.card_management.repository.CardRepository;
 
@@ -18,7 +19,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import com.wizz.card_management.repository.TransactionControlRepository;
 
 @ExtendWith(MockitoExtension.class)
 class CardControlsReadServiceImplTest {
@@ -28,6 +33,9 @@ class CardControlsReadServiceImplTest {
 
     @Mock
     private CardProgramRepository cardProgramRepository;
+
+    @Mock
+    private TransactionControlRepository transactionControlRepository;
 
     @InjectMocks
     private CardControlsReadServiceImpl service;
@@ -56,6 +64,14 @@ class CardControlsReadServiceImplTest {
         replacedCard.setCardProgramId("PROGRAM001");
         replacedCard.setCardStatus("R");
         replacedCard.setCustomerId("CUSTOMER001");
+
+        lenient().when(transactionControlRepository
+                .findByCardIdAndChannelType(
+                        anyString(),
+                        anyString()
+                ))
+                .thenReturn(Optional.empty());
+
     }
 
     @Test
@@ -524,6 +540,96 @@ class CardControlsReadServiceImplTest {
                                 "WEB",
                                 "partner-001"
                         )
+        );
+    }
+
+    @Test
+    void getTransactionControls_savedControl_returnsPersistedValue() {
+
+        Card card = new Card();
+        card.setCardId("CARD001");
+        card.setCustomerId("CUSTOMER001");
+        card.setCardStatus("A");
+
+        TxnControlsFetchRequest request =
+                new TxnControlsFetchRequest();
+
+        request.setCustomerId("CUSTOMER001");
+
+        TxnControlsFetchRequest.CardRef cardRef =
+                new TxnControlsFetchRequest.CardRef();
+
+        cardRef.setCardId("CARD001");
+
+        request.setCards(
+                List.of(cardRef)
+        );
+
+        TransactionControl savedControl =
+                new TransactionControl();
+
+        savedControl.setCardId("CARD001");
+        savedControl.setChannelType("ATM");
+        savedControl.setAllowed(false);
+        savedControl.setEditable(true);
+
+        when(cardRepository.findByCardId("CARD001"))
+                .thenReturn(Optional.of(card));
+
+        when(transactionControlRepository
+                .findByCardIdAndChannelType(
+                        "CARD001",
+                        "ATM"
+                ))
+                .thenReturn(Optional.of(savedControl));
+
+        when(transactionControlRepository
+                .findByCardIdAndChannelType(
+                        eq("CARD001"),
+                        argThat(channel ->
+                                !channel.equals("ATM")
+                        )
+                ))
+                .thenReturn(Optional.empty());
+
+        TxnControlsFetchResponse response =
+                service.getTransactionControls(
+                        request,
+                        "REQ-011",
+                        "WEB",
+                        "partner-001"
+                );
+
+        assertEquals(
+                "00",
+                response.getResponseCode()
+        );
+
+        assertEquals(
+                1,
+                response.getChannels().size()
+        );
+
+        TxnControlsFetchResponse.CardControls cardControls =
+                response.getChannels().get(0);
+
+        TxnControlsFetchResponse.ControlRow atmControl =
+                cardControls.getLists()
+                        .stream()
+                        .filter(control ->
+                                "ATM".equals(
+                                        control.getChannelType()
+                                )
+                        )
+                        .findFirst()
+                        .orElseThrow();
+
+        assertFalse(
+                atmControl.getAllowed()
+        );
+
+        assertTrue(
+                atmControl.getEditable()
         );
     }
 

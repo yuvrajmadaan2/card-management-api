@@ -180,7 +180,13 @@ public class SecurityConfig {
                                 "/v1/txnControls"
                         )
                         .authenticated()
-                        
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/txnControls/set"
+                        )
+                        .authenticated()
+
                         .anyRequest()
                         .authenticated()
                 )

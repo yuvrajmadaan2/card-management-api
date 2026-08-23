@@ -19,6 +19,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import com.wizz.card_management.entity.TransactionControl;
+import com.wizz.card_management.repository.TransactionControlRepository;
+
 @Service
 public class CardControlsReadServiceImpl
         implements CardControlsReadService {
@@ -41,13 +44,17 @@ public class CardControlsReadServiceImpl
 
     private final CardRepository cardRepository;
     private final CardProgramRepository cardProgramRepository;
+    private final TransactionControlRepository transactionControlRepository;
 
     public CardControlsReadServiceImpl(
             CardRepository cardRepository,
-            CardProgramRepository cardProgramRepository) {
+            CardProgramRepository cardProgramRepository,
+            TransactionControlRepository transactionControlRepository) {
 
         this.cardRepository = cardRepository;
         this.cardProgramRepository = cardProgramRepository;
+        this.transactionControlRepository =
+                transactionControlRepository;
     }
 
     @Override
@@ -207,18 +214,61 @@ public class CardControlsReadServiceImpl
 
             row.setChannelType(channelType);
 
-            applyCardStatusRules(
-                    row,
-                    card.getCardStatus()
-            );
+            /*
+            * First check whether API 5 has previously
+            * persisted a control for this card/channel.
+            */
+            Optional<TransactionControl> savedControl =
+                    transactionControlRepository
+                            .findByCardIdAndChannelType(
+                                    card.getCardId(),
+                                    channelType
+                            );
+
+            if (savedControl.isPresent()) {
+
+                TransactionControl control =
+                        savedControl.get();
+
+                row.setAllowed(
+                        control.isAllowed()
+                );
+
+                row.setEditable(
+                        control.isEditable()
+                );
+
+            } else {
+
+                /*
+                * No saved override exists.
+                * Use the normal API-4 default.
+                */
+                applyCardStatusRules(
+                        row,
+                        card.getCardStatus()
+                );
+            }
+
+            /*
+            * Blocked/replaced/inactive cards must never expose
+            * an enabled transaction channel, even if an old
+            * persisted control exists.
+            */
+            if ("B".equals(card.getCardStatus())
+                    || "R".equals(card.getCardStatus())
+                    || "I".equals(card.getCardStatus())) {
+
+                row.setAllowed(false);
+
+                if ("DOM".equals(channelType)) {
+                    row.setEditable(false);
+                }
+            }
 
             controls.add(row);
         }
 
-        /*
-         * The specification requires exactly seven
-         * normalized rows for every card.
-         */
         return controls;
     }
 
