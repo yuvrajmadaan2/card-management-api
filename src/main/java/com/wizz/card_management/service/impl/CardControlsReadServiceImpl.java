@@ -22,6 +22,8 @@ import java.util.Set;
 import com.wizz.card_management.entity.TransactionControl;
 import com.wizz.card_management.repository.TransactionControlRepository;
 
+
+
 @Service
 public class CardControlsReadServiceImpl
         implements CardControlsReadService {

@@ -633,6 +633,82 @@ class CardControlsReadServiceImplTest {
         );
     }
 
+    @Test
+    void getTransactionControls_persistedControlOverridesDefault() {
+
+        TxnControlsFetchRequest request =
+                createRequest(
+                        List.of("CARD001"),
+                        "CUSTOMER001"
+                );
+
+        when(cardRepository.findByCardId("CARD001"))
+                .thenReturn(Optional.of(activeCard));
+
+        TransactionControl control =
+                new TransactionControl();
+
+        control.setCardId("CARD001");
+        control.setChannelType("ATM");
+        control.setAllowed(false);
+        control.setEditable(true);
+
+        when(transactionControlRepository
+                .findByCardIdAndChannelType(
+                        "CARD001",
+                        "ATM"
+                ))
+                .thenReturn(Optional.of(control));
+
+        // Other channels do not have persisted overrides.
+        when(transactionControlRepository
+                .findByCardIdAndChannelType(
+                        eq("CARD001"),
+                        argThat(channel ->
+                                !"ATM".equals(channel)
+                        )))
+                .thenReturn(Optional.empty());
+
+        TxnControlsFetchResponse response =
+                service.getTransactionControls(
+                        request,
+                        "REQ-011",
+                        "WEB",
+                        "partner-001"
+                );
+
+        assertEquals(
+                "00",
+                response.getResponseCode()
+        );
+
+        assertEquals(
+                1,
+                response.getChannels().size()
+        );
+
+        TxnControlsFetchResponse.CardControls cardControls =
+                response.getChannels().get(0);
+
+        TxnControlsFetchResponse.ControlRow atmControl =
+                cardControls.getLists()
+                        .stream()
+                        .filter(controlRow ->
+                                "ATM".equals(
+                                        controlRow.getChannelType()
+                                ))
+                        .findFirst()
+                        .orElseThrow();
+
+        assertFalse(
+                atmControl.getAllowed()
+        );
+
+        assertTrue(
+                atmControl.getEditable()
+        );
+    }
+
     private TxnControlsFetchRequest createRequest(
             List<String> cardIds,
             String customerId) {

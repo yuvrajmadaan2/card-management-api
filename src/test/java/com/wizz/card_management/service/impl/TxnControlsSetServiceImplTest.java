@@ -18,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -450,6 +452,74 @@ class TxnControlsSetServiceImplTest {
                 transactionControlRepository,
                 never()
         ).save(any());
+    }
+
+    @Test
+    void setTransactionControl_sameValue_returnsNoOp() {
+
+        TxnControlsSetRequest request =
+                createRequest(
+                        "CARD001",
+                        "CUSTOMER001",
+                        "ATM",
+                        true
+                );
+
+        TransactionControl existingControl =
+                new TransactionControl();
+
+        existingControl.setCardId("CARD001");
+        existingControl.setChannelType("ATM");
+        existingControl.setAllowed(true);
+        existingControl.setEditable(true);
+
+        when(cardRepository.findByCardId("CARD001"))
+                .thenReturn(Optional.of(activeCard));
+
+        when(transactionControlRepository
+                .findByCardIdAndChannelType(
+                        "CARD001",
+                        "ATM"
+                ))
+                .thenReturn(Optional.of(existingControl));
+
+        TxnControlsSetResponse response =
+                service.setTransactionControl(
+                        request,
+                        "REQ-NOOP",
+                        "WEB",
+                        "partner-001"
+                );
+
+        assertEquals(
+                "00",
+                response.getResponseCode()
+        );
+
+        assertEquals(
+                "Transaction control already has the requested value",
+                response.getResponseDesc()
+        );
+
+        assertNotNull(response.getChannel());
+
+        assertEquals(
+                "ATM",
+                response.getChannel().getChannelType()
+        );
+
+        assertTrue(
+                response.getChannel().getAllowed()
+        );
+
+        assertTrue(
+                response.getChannel().getEditable()
+        );
+
+        verify(
+                transactionControlRepository,
+                never()
+        ).save(any(TransactionControl.class));
     }
 
     @Test

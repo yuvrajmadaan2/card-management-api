@@ -219,15 +219,39 @@ public class TxnControlsSetServiceImpl
         }
 
         /*
+        * No-op:
+        * requested value is already the effective value.
+        */
+        if (control.isAllowed() == requestedAllowed) {
+
+            TxnControlsSetResponse.Channel responseChannel =
+                    new TxnControlsSetResponse.Channel();
+
+            responseChannel.setChannelType(
+                    control.getChannelType()
+            );
+            responseChannel.setAllowed(
+                    control.isAllowed()
+            );
+            responseChannel.setEditable(
+                    control.isEditable()
+            );
+
+            response.setChannel(responseChannel);
+            response.setResponseCode("00");
+            response.setResponseDesc(
+                    "Transaction control already has the requested value"
+            );
+
+            return response;
+        }
+
+        /*
          * Apply requested value.
          */
-        control.setAllowed(
-                requestedAllowed
-        );
+        control.setAllowed(requestedAllowed);
 
-        transactionControlRepository.save(
-                control
-        );
+        transactionControlRepository.save(control);
 
         log.info(
                 "Transaction control updated successfully " +
@@ -237,6 +261,21 @@ public class TxnControlsSetServiceImpl
                 channelType,
                 requestedAllowed
         );
+
+        TxnControlsSetResponse.Channel responseChannel =
+                new TxnControlsSetResponse.Channel();
+
+        responseChannel.setChannelType(
+                control.getChannelType()
+        );
+        responseChannel.setAllowed(
+                control.isAllowed()
+        );
+        responseChannel.setEditable(
+                control.isEditable()
+        );
+
+        response.setChannel(responseChannel);
 
         response.setResponseCode("00");
         response.setResponseDesc(

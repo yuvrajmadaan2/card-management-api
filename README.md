@@ -1,76 +1,245 @@
 # Card Management API
 
-Spring Boot REST API for creating cards under a card program and retrieving card details.
+Spring Boot REST API implementing five Card Management APIs from the internship implementation guide. The APIs are organized around the Card resource and follow a layered Controller → Service → Repository architecture.
+
+## APIs Implemented
+
+| # | API | Endpoint | Purpose |
+|---|---|---|---|
+| 1 | Create Card | `POST /v1/cards` | Create a card under a card program |
+| 2 | Card Details | `POST /v1/cards/details` | Retrieve details for one or more cards |
+| 3 | Card Status | `POST /v1/cards/setStatus` | Update the lifecycle status of a card |
+| 4 | Transaction Controls | `POST /v1/txnControls` | Retrieve transaction controls for card(s) |
+| 5 | Transaction Control Update | `POST /v1/txnControls/set` | Update one transaction channel control |
+
+The five APIs correspond to Spec APIs 1, 9, 3, 10 and 11 respectively.
+
+---
 
 ## Tech Stack
 
 - Java
 - Spring Boot
 - Spring Security
-- OAuth2 / JWT
+- OAuth2 Resource Server / JWT
 - Dex
 - H2 Database
-- JPA / Hibernate
+- Spring Data JPA / Hibernate
 - Maven
 - Swagger / OpenAPI
+- JUnit 5
+- Mockito
 
-## APIs
+---
 
-### Create Card
+# 1. Common API Conventions
 
+## Base URL
+
+```text
+/v1
+```
+
+All five APIs use the versioned `/v1` endpoint pattern.
+
+## Common Headers
+
+The following headers are used across the APIs:
+
+```text
+Content-Type: application/json
+Authorization: Bearer <access_token>
+X-Request-Id: <unique-request-id>
+```
+
+Optional channel header:
+
+```text
+X-Channel: MOBILE | WEB | BRANCH | PARTNER
+```
+
+`X-Request-Id` is propagated through the request and returned in the response header. Where applicable, the same value is also represented as `referenceId` in the response body.
+
+## Idempotency
+
+Only card creation requires:
+
+```text
+X-Idempotency-Key: <unique-idempotency-key>
+```
+
+Rules:
+
+- `POST /v1/cards` — required
+- `POST /v1/cards/details` — not required
+- `POST /v1/cards/setStatus` — not required
+- `POST /v1/txnControls` — not required
+- `POST /v1/txnControls/set` — not required
+
+For card creation:
+
+- Same idempotency key + same request → previous response is replayed.
+- Same idempotency key + different request → idempotency conflict.
+- Database uniqueness is used to protect idempotency records.
+
+---
+
+# 2. Authentication and Authorization
+
+The application uses Spring Security OAuth2 Resource Server with JWT authentication.
+
+The JWT `sub` claim is treated as the partner ID.
+
+Example JWT:
+
+```json
+{
+  "sub": "partner-001",
+  "groups": [
+    "cards:write"
+  ]
+}
+```
+
+JWT authorities are mapped from the `groups` claim using the application's `SCOPE_` authority convention.
+
+Authentication and authorization are enforced before business processing.
+
+Partner identity is also used for partner-level rate limiting.
+
+---
+
+# 3. Security Rules
+
+The implementation follows these security requirements:
+
+- Never return a full PAN.
+- Never log PAN, CVV, PIN, tokens or other secrets.
+- Card numbers are returned in masked form.
+- H2 Console and Swagger/OpenAPI are intended for local development only.
+- H2 access is protected outside the local development setup.
+- CORS is restricted to configured origins rather than using a wildcard.
+- HSTS is enabled.
+- Production TLS termination should be handled by the reverse proxy/API gateway.
+- Production certificates, private keys and secrets must not be committed to Git.
+
+Example masked PAN:
+
+```text
+4111XXXXXXXX1234
+```
+
+---
+
+# 4. API 1 — Create Card
+
+## Endpoint
+
+```http
 POST /v1/cards
+```
 
-Required headers:
+## Required Headers
 
+```text
 Authorization: Bearer <JWT>
 X-Request-Id: <unique-request-id>
 X-Idempotency-Key: <unique-idempotency-key>
 X-Channel: <channel>
+```
 
-The JWT `sub` claim is used as the partner ID.
+## Request
 
-The endpoint requires the `cards:write` scope.
+```json
+{
+  "card": {
+    "cardProgramType": "P",
+    "cardType": "V",
+    "cardProgramId": "PRGM001"
+  }
+}
+```
 
-### Card Details
+## Main Request Rules
 
+- `card` is mandatory.
+- `cardProgramType` must use the supported program type values.
+- `cardType` must use the supported card type values.
+- `cardProgramId` is mandatory and length validated.
+- The selected card program must be valid/active.
+- Card program and card type compatibility is validated.
+- Idempotency is enforced.
+
+## Success Response
+
+```json
+{
+  "cardNumber": "4111XXXXXXXX1234",
+  "expiryDate": "07/2031",
+  "cardId": "110195026979612",
+  "referenceId": "f3a1c9e0-9f2b-4a7e-b6c1-2d9e8a4f7c10",
+  "responseCode": "00",
+  "responseDesc": "Card created successfully"
+}
+```
+
+## Important Edge Cases
+
+- Invalid card program ID
+- Inactive card program
+- Card program/card type mismatch
+- Idempotency replay
+- Idempotency conflict
+- Validation failure
+- Rate limiting
+
+---
+
+# 5. API 2 — Card Details
+
+## Endpoint
+
+```http
 POST /v1/cards/details
+```
 
-Required headers:
+## Required Headers
 
+```text
 Authorization: Bearer <JWT>
 X-Request-Id: <unique-request-id>
+```
 
-Optional header:
+Optional:
 
+```text
 X-Channel: MOBILE | WEB | BRANCH | PARTNER
+```
 
-The JWT `sub` claim is used as the partner ID.
-
-The endpoint uses the authenticated partner identity for authorization and rate limiting.
-
-#### Request
+## Request
 
 ```json
 {
   "cards": [
     {
-      "cardId": "CARD001"
+      "cardId": "110195026979612"
     }
   ],
   "customerId": "0012342"
 }
 ```
 
-Request rules:
+## Request Rules
 
 - `cards` is mandatory.
-- Between 1 and 10 cards can be requested.
+- At least 1 card and at most 10 cards can be requested.
 - Duplicate card IDs are de-duplicated.
-- `customerId` is conditional based on channel/entitlement.
-- Each `cardId` must not exceed 20 characters.
-- `customerId` must not exceed 20 characters.
+- `cardId` cannot be blank and is length validated.
+- `customerId` is conditional based on channel/entitlement rules.
+- Ownership is validated when customer information is applicable.
+- Partner identity is obtained from JWT `sub`.
 
-#### Response
+## Success Response
 
 ```json
 {
@@ -79,7 +248,7 @@ Request rules:
   "responseDesc": "Card details retrieved successfully",
   "cards": [
     {
-      "cardId": "CARD001",
+      "cardId": "110195026979612",
       "cardProgramType": "P",
       "cardType": "V",
       "cardProgramId": "PRGM001",
@@ -96,159 +265,513 @@ Request rules:
 }
 ```
 
-#### Card Details Response Codes
+## Partial Success
 
-- `00` - Card details retrieved successfully
-- `10` - No card details found
-- `90` - Customer-card ownership mismatch
+If multiple cards are requested and only some are found, the API returns the details of the cards that were successfully resolved instead of failing the complete request.
 
-The API supports partial success when some requested card IDs are found and others are unknown.
-
-Card numbers are returned in masked form.
-
-## Response Codes
-
-HTTP Status | Response Code | Meaning
----|---|---
-200 | 00 | Card created successfully / Card details retrieved successfully
-200 | 10 | Business decline / No card details found
-200 | 90 | Customer-card ownership mismatch
-400 | 01 | Invalid request
-401 | 98 | Unauthorized
-403 | 98 | Forbidden
-409 | 09 | Idempotency key conflict
-429 | - | Rate limit exceeded
-
-## Idempotency
-
-The API supports idempotent card creation using the `X-Idempotency-Key` header.
-
-- Same key + same request -> previous response is replayed.
-- Same key + different request -> 409 Conflict with response code 09.
-- Database uniqueness protects against duplicate idempotency keys.
-
-The `X-Idempotency-Key` header is required for card creation.
-
-It is not required for the Card Details API.
-
-## Rate Limiting
-
-Card creation and card details retrieval are rate limited per partner.
-
-The partner is identified using the JWT `sub` claim.
-
-Requests exceeding the configured rate limit receive:
-
-HTTP 429 Too Many Requests
-
-## Security
-
-The API uses OAuth2 Resource Server with JWT authentication.
-
-JWT authorities are read from the `groups` claim and converted using the `SCOPE_` prefix.
-
-Example:
-
-```json
-{
-  "sub": "partner-001",
-  "groups": [
-    "cards:write"
-  ]
-}
-```
-
-The authenticated partner identity is obtained from the JWT `sub` claim.
-
-The Card Details API performs customer-card ownership validation when `customerId` is supplied in the request.
-
-A token without the `cards:write` scope receives:
-
-403 Forbidden
-
-## Request ID
-
-`X-Request-Id` is required for API requests.
-
-The value is echoed in successful responses and handled application/security error responses.
-
-The same value is also returned as `referenceId` in API response payloads where applicable.
-
-## Card Details Validation
-
-The Card Details API validates:
-
-- Request body presence.
-- `cards` list presence.
-- At least one card must be supplied.
-- Maximum of 10 cards per request.
-- `cardId` must not be blank.
-- `cardId` must not exceed 20 characters.
-- `customerId` must not exceed 20 characters.
-
-Duplicate card IDs in the same request are processed only once.
-
-## Card Details Ownership
-
-When a `customerId` is supplied, the API verifies that the requested card belongs to that customer.
-
-If the card and customer ownership do not match, the API returns:
+## Ownership Mismatch
 
 ```json
 {
   "referenceId": "REQ-005",
   "responseCode": "90",
-  "responseDesc": "Customer-card ownership mismatch - details request declined",
-  "cards": []
+  "responseDesc": "Customer-card ownership mismatch - details request declined"
 }
 ```
 
-## Card Details Partial Success
+## Response Codes
 
-The Card Details API supports partial success.
+```text
+00 - Card details retrieved successfully
+10 - No card details found
+90 - Customer-card ownership mismatch
+```
 
-If multiple cards are requested and some card IDs are not found, the API returns the details of the cards that were successfully found.
+---
 
-For example:
+# 6. API 3 — Update Card Status
+
+## Endpoint
+
+```http
+POST /v1/cards/setStatus
+```
+
+## Required Headers
+
+```text
+Authorization: Bearer <JWT>
+X-Request-Id: <unique-request-id>
+```
+
+Optional:
+
+```text
+X-Channel: MOBILE | WEB | BRANCH | PARTNER
+```
+
+## Request
 
 ```json
 {
-  "referenceId": "REQ-006",
+  "card": {
+    "cardId": "110195026979612",
+    "statusCode": "S",
+    "reasonCode": "CUSTREQ",
+    "remarks": "Temporary travel freeze"
+  }
+}
+```
+
+## Request Fields
+
+- `card.cardId`
+- `card.statusCode`
+- `card.reasonCode`
+- `card.remarks`
+
+Supported status values are:
+
+```text
+A - Active
+B - Blocked
+S - Suspended
+R - Replaced
+I - Inactive
+```
+
+## Validation
+
+- `card` is mandatory.
+- `cardId` is mandatory.
+- `statusCode` is mandatory and validated.
+- `reasonCode` is mandatory for `B`, `S` and `R`.
+- `remarks` is optional.
+- Status transitions are validated against the applicable specification rules.
+- Terminal status restrictions are enforced.
+- Reason-code applicability is validated against the status rules defined by the specification.
+
+## Success Response
+
+```json
+{
+  "cardNumber": "4111XXXXXXXX1234",
+  "cardProgramName": "WizzPlus Multicurrency Prepaid",
+  "customerId": "0012342",
   "responseCode": "00",
-  "responseDesc": "Card details retrieved successfully",
+  "responseDesc": "Card status updated to TEMP SUSPENDED"
+}
+```
+
+## Business Validation Example
+
+```json
+{
+  "responseCode": "36",
+  "responseDesc": "Reason code not applicable for requested status"
+}
+```
+
+## Edge Cases
+
+- Invalid status
+- Invalid status transition
+- Terminal status mutation
+- Missing reason code for `B`, `S` or `R`
+- Reason code not applicable to requested status
+- Card not found
+- Card already in requested status
+- Unauthorized status mutation
+- Repository/system failure
+
+---
+
+# 7. API 4 — Read Transaction Controls
+
+## Endpoint
+
+```http
+POST /v1/txnControls
+```
+
+## Required Headers
+
+```text
+Authorization: Bearer <JWT>
+X-Request-Id: <unique-request-id>
+```
+
+Optional:
+
+```text
+X-Channel: MOBILE | WEB | BRANCH | PARTNER
+```
+
+## Request
+
+```json
+{
   "cards": [
     {
-      "cardId": "CARD001"
+      "cardId": "110195026979612"
+    }
+  ],
+  "customerId": "0012342"
+}
+```
+
+## Request Rules
+
+- `cards` is mandatory.
+- Between 1 and 10 cards can be requested.
+- Each `cardId` is validated.
+- `customerId` is conditional based on the applicable channel/entitlement rules.
+- Ownership checks are consistent with Card Details.
+- Unknown card IDs are handled according to the API's partial/not-found behavior.
+
+## Seven Supported Channels
+
+Every returned card has a normalized transaction-control matrix containing:
+
+```text
+ATM
+POS
+ECOM
+NFC
+MAG
+DOM
+INT
+```
+
+Each channel contains:
+
+```json
+{
+  "channelType": "ATM",
+  "allowed": true,
+  "editable": true
+}
+```
+
+## Sample Response
+
+```json
+{
+  "responseCode": "00",
+  "responseDesc": "Transaction channel controls retrieved successfully",
+  "channels": [
+    {
+      "cardId": "110195026979612",
+      "lists": [
+        {
+          "channelType": "ATM",
+          "allowed": true,
+          "editable": true
+        },
+        {
+          "channelType": "POS",
+          "allowed": true,
+          "editable": true
+        },
+        {
+          "channelType": "ECOM",
+          "allowed": true,
+          "editable": true
+        },
+        {
+          "channelType": "NFC",
+          "allowed": true,
+          "editable": true
+        },
+        {
+          "channelType": "MAG",
+          "allowed": false,
+          "editable": true
+        },
+        {
+          "channelType": "DOM",
+          "allowed": false,
+          "editable": false
+        },
+        {
+          "channelType": "INT",
+          "allowed": true,
+          "editable": true
+        }
+      ]
     }
   ]
 }
 ```
 
-## PAN Masking
+## Important Behavior
 
-Card numbers are returned in masked form.
+Transaction controls are represented as the effective state for the card.
 
-Example:
+Where a persisted transaction-control value exists, the effective returned value should reflect that persisted state. Otherwise, applicable program/card-status defaults are used.
 
-```text
-4111XXXXXXXX1234
+## Edge Cases
+
+- Unknown card
+- Partial card lookup
+- Ownership mismatch
+- Missing customer ID where required
+- Blocked/replaced card behavior
+- Program defaults for cards that are not yet issued, where applicable
+
+---
+
+# 8. API 5 — Update Transaction Control
+
+## Endpoint
+
+```http
+POST /v1/txnControls/set
 ```
 
-The card creation flow stores the masked card number in the `Card` entity, and the Card Details API returns the stored masked value.
+## Required Headers
 
-Full card numbers are not returned by the Card Details API.
+```text
+Authorization: Bearer <JWT>
+X-Request-Id: <unique-request-id>
+```
 
-## Local Development
+Optional:
 
-Swagger, SQL logging, and the H2 console are enabled only through the `local` profile.
+```text
+X-Channel: MOBILE | WEB | BRANCH | PARTNER
+```
 
-Start the application with:
+## Request
+
+```json
+{
+  "cardId": "110195026979612",
+  "customerId": "0012342",
+  "channel": {
+    "channelType": "ATM",
+    "allowed": false
+  }
+}
+```
+
+## Supported Channel Types
+
+```text
+ATM
+POS
+ECOM
+NFC
+MAG
+DOM
+INT
+```
+
+## Rules
+
+- Only one transaction-control change is made per request.
+- `cardId` is mandatory.
+- `channel` is mandatory.
+- `channel.channelType` must be one of the supported channel values.
+- `channel.allowed` is mandatory.
+- Ownership/entitlement checks are enforced where applicable.
+- Blocked/replaced/inactive card restrictions are enforced.
+- Non-editable controls cannot be changed.
+- Updates are performed transactionally.
+- The effective persisted state is returned.
+- If the requested value is already the current value, the operation is treated as a no-op.
+
+## Success Response
+
+```json
+{
+  "cardId": "110195026979612",
+  "responseCode": "00",
+  "responseDesc": "Channel control updated successfully",
+  "channel": {
+    "channelType": "ATM",
+    "allowed": false,
+    "editable": true
+  }
+}
+```
+
+## Locked Control Example
+
+```json
+{
+  "responseCode": "60",
+  "responseDesc": "Control locked by program policy — change not permitted"
+}
+```
+
+## Edge Cases
+
+- Card not issued/activated
+- Card blocked
+- Card replaced
+- Non-editable control
+- Invalid channel type
+- Ownership/entitlement failure
+- Same requested value as current value
+- Repository/system failure
+- Risk/step-up requirements where applicable
+
+---
+
+# 9. Common Error Model
+
+The application uses a consistent business error structure:
+
+```json
+{
+  "referenceId": "REQ-001",
+  "responseCode": "01",
+  "responseDesc": "Invalid request"
+}
+```
+
+The standard fields are:
+
+- `referenceId`
+- `responseCode`
+- `responseDesc`
+
+HTTP status and business `responseCode` are separate concepts. A response with HTTP 200 must still be evaluated using `responseCode`.
+
+## HTTP Baseline
+
+| HTTP Status | Meaning |
+|---|---|
+| 200 | Successful response or business decline |
+| 400 | Invalid/missing request data |
+| 401 | Invalid or missing authentication |
+| 403 | Scope, ownership or entitlement failure |
+| 404 | Endpoint/resource not found |
+| 409 | Idempotency conflict where applicable |
+| 422 | Semantic/business validation failure |
+| 429 | Rate limit exceeded |
+| 500 | Internal system error |
+| 504 | Downstream timeout where applicable |
+
+---
+
+# 10. Rate Limiting
+
+Requests are rate limited per partner.
+
+The partner is identified from:
+
+```text
+JWT sub claim
+```
+
+The configured exercise limit is:
+
+```text
+100 requests per partner
+```
+
+Requests exceeding the configured limit receive:
+
+```text
+HTTP 429 Too Many Requests
+```
+
+The response also preserves the request ID where applicable.
+
+---
+
+# 11. Layered Architecture
+
+The project follows:
+
+```text
+Controller
+    ↓
+Service
+    ↓
+Repository
+    ↓
+Database
+```
+
+## Controller
+
+Responsible for:
+
+- Request mapping
+- Request validation
+- Header extraction
+- Authentication context
+- Rate-limit check
+- Calling the service
+- Mapping the service response
+- Returning `X-Request-Id`
+
+Controllers do not contain repository/business logic.
+
+## Service
+
+Responsible for:
+
+- Business rules
+- Ownership checks
+- Validation beyond simple DTO validation
+- Card status rules
+- Transaction-control rules
+- Idempotency orchestration
+- Transaction boundaries
+
+## Repository
+
+Responsible for:
+
+- Database access
+- Reusing existing queries where possible
+- Minimal custom queries when required
+
+## DTOs
+
+DTOs represent the external API contract and are kept separate from persistence entities.
+
+---
+
+# 12. Logging
+
+Application logging includes, where appropriate:
+
+- API name
+- Request/reference ID
+- Card ID or other non-secret identifiers
+- Partner ID where useful
+- Channel
+- Execution time
+
+Sensitive information must never be logged, including:
+
+- Full PAN
+- CVV
+- PIN
+- Access tokens
+- Session assertions
+- Other secrets
+
+---
+
+# 13. OpenAPI / Swagger
+
+OpenAPI annotations are included for the APIs.
+
+Swagger/OpenAPI is enabled for local development through the `local` profile.
+
+Run:
 
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-The local profile enables:
+Local development enables:
 
 - Swagger/OpenAPI
 - Swagger UI
@@ -258,46 +781,44 @@ The local profile enables:
 
 These settings are intended for local development only.
 
-## Swagger / OpenAPI
+---
 
-Swagger/OpenAPI documentation is available when running with the `local` profile.
+# 14. Database
 
-The APIs include OpenAPI annotations describing:
+The application uses:
 
-- API operation
-- Successful response
-- Validation errors
-- Unauthorized responses
-- Forbidden responses
+- H2
+- Spring Data JPA
+- Hibernate
 
-## TLS / HTTPS Deployment
+The main resource is the Card entity.
 
-TLS/HTTPS should be terminated at the reverse proxy or API gateway in front of the Spring Boot application.
+Transaction-control updates are persisted so that the effective state can be returned by the transaction-control read API.
 
-Recommended deployment flow:
+---
+
+# 15. PAN Masking
+
+PAN/card numbers are always returned in masked form.
+
+Example:
 
 ```text
-Client
-  |
-  | HTTPS
-  v
-Reverse Proxy / API Gateway
-  |
-  | HTTP or internal HTTPS
-  v
-Spring Boot Application
+4111XXXXXXXX1234
 ```
 
-The application enables HTTP Strict Transport Security (HSTS):
+The full PAN must not be exposed in:
 
-- includeSubDomains=true
-- maxAge=31536000
+- API responses
+- logs
+- error messages
+- test output
 
-Production deployments should configure TLS certificates, private keys, supported TLS versions, and cipher suites at the reverse proxy/API gateway according to the organization's security standards.
+The Card Details API returns the masked card number stored by the card creation flow.
 
-Do not commit production private keys or certificates to the repository.
+---
 
-## Testing
+# 16. Testing
 
 Run all tests with:
 
@@ -305,44 +826,186 @@ Run all tests with:
 mvn clean test
 ```
 
-The project includes tests for:
+The project contains controller and service tests for the implemented APIs.
 
-### Card Creation
+## API 1 Tests
 
-- Card creation
-- Validation
-- Invalid card programs
-- Inactive card programs
-- Card program type mismatch
+Coverage includes:
+
+- Successful card creation
+- Request validation
+- Invalid card program
+- Inactive card program
+- Card program/card type mismatch
 - Idempotency replay
 - Idempotency conflict
 - Rate limiting
-- Security scope enforcement
-- X-Request-Id handling
+- Security scope behavior
+- Request ID handling
 
-### Card Details
+## API 2 Tests
 
-- Card details retrieval
-- Card details validation
+Coverage includes:
+
+- Successful card-details retrieval
+- Request validation
 - Card not found
 - Duplicate card handling
 - Partial success
 - Customer-card ownership mismatch
 - Customer ID handling
 - Rate limiting
-- X-Request-Id handling
-- Internal repository exception handling
+- Request ID handling
+- Repository/internal exception handling
 
-## Git Workflow
+## API 3 Tests
 
-API changes are developed on feature branches and submitted through pull requests for review.
+Coverage includes:
 
-The `main` branch should not be directly modified without the appropriate review and approval.
+- Successful status update
+- Validation failures
+- Missing reason code
+- Invalid status
+- Status transition validation
+- Terminal-state protection
+- Reason-code applicability
+- Same-status/no-op behavior
+- Card not found
+- Internal exception handling
 
-## Notes
+## API 4 Tests
 
-- Production secrets should not be committed to Git.
-- Production TLS certificates and private keys should be managed outside the repository.
+Coverage includes:
+
+- Successful seven-channel response
+- Card validation
+- Card not found/partial lookup behavior
+- Ownership validation
+- Customer ID handling
+- Status-specific behavior
+- Persisted transaction-control override behavior
+- Rate limiting
+- Request ID handling
+- Internal exception handling
+
+## API 5 Tests
+
+Coverage includes:
+
+- Successful control update
+- Invalid channel type
+- Ownership validation
+- Card not found
+- Blocked/replaced/inactive card behavior
+- Non-editable control
+- No-op update
+- Effective post-update response
+- Repository/internal exception handling
+
+---
+
+# 17. Local Development
+
+Clone the repository and switch to the branch you want to work on.
+
+Install/build:
+
+```bash
+mvn clean install
+```
+
+Run locally:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+Run tests:
+
+```bash
+mvn clean test
+```
+
+---
+
+# 18. Git Branch Structure
+
+The APIs are developed on separate feature branches.
+
+Expected branches:
+
+```text
+main
+api-2-card-details
+api-3-card-status
+api-4-transaction-controls
+api-5-transaction-controls-set
+```
+
+The first API is maintained on the approved/main implementation, while subsequent APIs are developed on their respective feature branches.
+
+Changes should be reviewed before merging into the main branch.
+
+---
+
+# 19. Internship Requirements Checklist
+
+The implementation follows the internship guide requirements:
+
+- [x] Controller/service/repository layering
+- [x] Request/response DTOs
+- [x] Input validation
+- [x] Error handling
+- [x] Unit tests
+- [x] OpenAPI annotations
+- [x] PAN masking
+- [x] Request ID handling
+- [x] JWT authentication
+- [x] Partner ID from JWT `sub`
+- [x] Per-partner rate limiting
+- [x] Card creation idempotency
+- [x] Card details partial success
+- [x] Customer-card ownership validation
+- [x] Card status update flow
+- [x] Transaction-control seven-channel model
+- [x] Transaction-control update flow
+- [x] Control lock/editability enforcement
+- [x] Transaction-control no-op behavior
+- [x] Effective persisted transaction-control state
+- [x] Local-only Swagger/H2 development setup
+- [x] CORS restrictions
+- [x] HSTS configuration
+
+---
+
+# 20. Definition of Done
+
+An API is considered complete when:
+
+1. API behavior matches the applicable specification.
+2. Request and response contracts are implemented correctly.
+3. Validation and business rules are enforced server-side.
+4. Authentication and authorization are enforced.
+5. Ownership/entitlement checks are implemented where required.
+6. Sensitive information is never exposed.
+7. Rate limiting is applied.
+8. `X-Request-Id` is propagated.
+9. Business response codes are handled correctly.
+10. Unit/controller tests cover success and important failure paths.
+11. OpenAPI documentation is present.
+12. Mentor review comments are resolved.
+13. `mvn clean test` passes.
+
+---
+
+# 21. Important Notes
+
+- Do not commit production secrets.
+- Do not commit production TLS private keys or certificates.
+- Do not expose full PAN values.
+- Do not log sensitive authentication or card information.
 - Swagger and H2 Console are intended for local development.
-- Card numbers must remain masked in API responses.
-- API business outcomes should be determined using `responseCode` rather than HTTP 200 alone.
+- Check `responseCode` in addition to the HTTP status.
+- Keep controllers free of repository/business logic.
+- Reuse existing repositories and add only necessary queries.
+- Keep API contracts aligned with the internship specification.
