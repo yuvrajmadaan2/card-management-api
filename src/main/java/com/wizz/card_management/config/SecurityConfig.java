@@ -155,7 +155,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/h2-console/**"
                         )
-                        .permitAll()
+                        .denyAll()
 
                         .requestMatchers(
                                 HttpMethod.POST,
