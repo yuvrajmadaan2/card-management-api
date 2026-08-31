@@ -247,12 +247,38 @@ public class TxnControlsSetServiceImpl
         }
 
         /*
-         * Apply requested value.
-         */
+        * Apply requested value.
+        *
+        * If the requested value is already the current value,
+        * treat the request as a successful no-op.
+        */
+        if (control.isAllowed() == requestedAllowed) {
+
+        log.info(
+                "Transaction control already has requested value " +
+                "requestId={} cardId={} channelType={} allowed={}",
+                requestId,
+                cardId,
+                channelType,
+                requestedAllowed
+        );
+
+        } else {
+
         control.setAllowed(requestedAllowed);
 
         transactionControlRepository.save(control);
 
+        log.info(
+                "Transaction control updated successfully " +
+                "requestId={} cardId={} channelType={} allowed={}",
+                requestId,
+                cardId,
+                channelType,
+                requestedAllowed
+        );
+        }
+        
         log.info(
                 "Transaction control updated successfully " +
                 "requestId={} cardId={} channelType={} allowed={}",
