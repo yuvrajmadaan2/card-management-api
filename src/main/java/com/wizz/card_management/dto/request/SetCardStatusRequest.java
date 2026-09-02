@@ -4,6 +4,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Pattern;
 
 public class SetCardStatusRequest {
 
@@ -31,10 +33,7 @@ public class SetCardStatusRequest {
         @NotBlank(message = "statusCode is mandatory")
         private String statusCode;
 
-        @Size(
-                max = 20,
-                message = "reasonCode must not exceed 20 characters"
-        )
+        @Size(max = 10)
         private String reasonCode;
 
         @Size(

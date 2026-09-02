@@ -59,7 +59,11 @@ public class CardStatusController {
             @ApiResponse(
                     responseCode = "500",
                     description = "Internal server error"
-            )
+            ),
+                @ApiResponse(
+                        responseCode = "422",
+                        description = "Invalid card status transition or reason code"
+                )
     })
     @PostMapping("/setStatus")
     public ResponseEntity<SetCardStatusResponse> updateCardStatus(

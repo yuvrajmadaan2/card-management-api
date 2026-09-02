@@ -80,7 +80,7 @@ public class CardStatusUpdateServiceImpl
         }
 
         /*
-         * reasonCode is mandatory for B, S and R.
+         * Reason code is mandatory for B, S and R.
          */
         if (requiresReasonCode(requestedStatus)
                 && (reasonCode == null
@@ -89,6 +89,20 @@ public class CardStatusUpdateServiceImpl
             response.setResponseCode("02");
             response.setResponseDesc(
                     "Reason code is mandatory for the requested card status"
+            );
+
+            return response;
+        }
+
+        /*
+         * Validate reason code for the requested status.
+         */
+        if (requiresReasonCode(requestedStatus)
+                && !isValidReasonCode(requestedStatus, reasonCode)) {
+
+            response.setResponseCode("36");
+            response.setResponseDesc(
+                    "Invalid reason code for the requested card status"
             );
 
             return response;
@@ -140,12 +154,15 @@ public class CardStatusUpdateServiceImpl
         }
 
         /*
-         * Validate the supported transition rules.
+         * Validate supported transition rules.
          *
-         * The internship guide requires transition validation,
-         * but does not provide a complete transition matrix.
-         * Therefore only terminal-state protection is enforced
-         * here without inventing undocumented transitions.
+         * The internship guide requires transition
+         * validation against the approved matrix.
+         * The complete matrix is not provided in the
+         * implementation guide, so no undocumented
+         * transition matrix is invented here.
+         *
+         * Replaced cards are treated as terminal.
          */
         if (isTerminalStatus(currentStatus)) {
 
@@ -185,6 +202,51 @@ public class CardStatusUpdateServiceImpl
         return response;
     }
 
+    /*
+     * Validates whether a reason code is applicable
+     * to the requested card status.
+     *
+     * B = BLOCKED
+     * S = TEMP SUSPENDED
+     * R = REPLACED
+     */
+    private boolean isValidReasonCode(
+            String statusCode,
+            String reasonCode) {
+
+        if (reasonCode == null || reasonCode.isBlank()) {
+            return false;
+        }
+
+        switch (statusCode) {
+
+            case "B":
+                return Set.of(
+                        "CUSTREQ",
+                        "FRAUD",
+                        "LOST",
+                        "STOLEN"
+                ).contains(reasonCode);
+
+            case "S":
+                return Set.of(
+                        "CUSTREQ",
+                        "SUSPECT"
+                ).contains(reasonCode);
+
+            case "R":
+                return Set.of(
+                        "EXPIRED",
+                        "DAMAGED",
+                        "LOST",
+                        "STOLEN"
+                ).contains(reasonCode);
+
+            default:
+                return true;
+        }
+    }
+
     private boolean requiresReasonCode(
             String statusCode) {
 
@@ -198,9 +260,8 @@ public class CardStatusUpdateServiceImpl
 
         /*
          * R = REPLACED is treated as terminal.
-         *
-         * No further transition is allowed from a
-         * replaced card.
+         * No further transition is allowed from
+         * a replaced card.
          */
         return "R".equals(statusCode);
     }
