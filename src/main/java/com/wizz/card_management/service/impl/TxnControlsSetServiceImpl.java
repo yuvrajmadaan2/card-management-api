@@ -36,6 +36,7 @@ public class TxnControlsSetServiceImpl
             );
 
     private final CardRepository cardRepository;
+
     private final TransactionControlRepository
             transactionControlRepository;
 
@@ -82,13 +83,11 @@ public class TxnControlsSetServiceImpl
         Boolean requestedAllowed =
                 request.getChannel().getAllowed();
 
-        /*
-         * Validate channel type.
-         */
-        if (!VALID_CHANNEL_TYPES.contains(
-                channelType)) {
+        // Validate channel type
+        if (!VALID_CHANNEL_TYPES.contains(channelType)) {
 
             response.setResponseCode("01");
+
             response.setResponseDesc(
                     "Invalid transaction channel type"
             );
@@ -96,13 +95,11 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        /*
-         * DOM is a locked control in the current
-         * program policy and cannot be edited.
-         */
+        // DOM is not editable
         if ("DOM".equals(channelType)) {
 
             response.setResponseCode("31");
+
             response.setResponseDesc(
                     "Transaction channel is not editable"
             );
@@ -110,9 +107,7 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        /*
-         * Find card.
-         */
+        // Find card
         Card card =
                 cardRepository.findByCardId(cardId)
                         .orElse(null);
@@ -126,6 +121,7 @@ public class TxnControlsSetServiceImpl
             );
 
             response.setResponseCode("10");
+
             response.setResponseDesc(
                     "Card not found"
             );
@@ -133,13 +129,7 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        /*
-         * Ownership check.
-         *
-         * Same rule currently used by API 2 and API 4:
-         * when customerId is supplied, it must match
-         * the card customer.
-         */
+        // Ownership check
         String requestedCustomerId =
                 request.getCustomerId();
 
@@ -156,6 +146,7 @@ public class TxnControlsSetServiceImpl
             );
 
             response.setResponseCode("90");
+
             response.setResponseDesc(
                     "Customer-card ownership mismatch"
             );
@@ -163,15 +154,14 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        /*
-         * Blocked, replaced and inactive cards cannot
-         * have transaction controls changed.
-         */
+        // Blocked, replaced and inactive cards cannot
+        // have transaction controls changed.
         if ("B".equals(card.getCardStatus())
                 || "R".equals(card.getCardStatus())
                 || "I".equals(card.getCardStatus())) {
 
             response.setResponseCode("31");
+
             response.setResponseDesc(
                     "Transaction controls cannot be updated for the current card status"
             );
@@ -179,9 +169,7 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        /*
-         * Find existing control.
-         */
+        // Find existing control
         TransactionControl control =
                 transactionControlRepository
                         .findByCardIdAndChannelType(
@@ -190,38 +178,50 @@ public class TxnControlsSetServiceImpl
                         )
                         .orElse(null);
 
-        /*
-         * If no persisted control exists, create one.
-         *
-         * Editable defaults are based on the same API-4
-         * control model.
-         */
+        // If no persisted control exists, create one
         if (control == null) {
 
             control = new TransactionControl();
 
             control.setCardId(cardId);
+
             control.setChannelType(channelType);
+
             control.setEditable(true);
+
+            control.setAllowed(false);
         }
 
-        /*
-         * Protect non-editable controls.
-         */
+        // Protect non-editable controls
         if (!control.isEditable()) {
 
             response.setResponseCode("31");
+
             response.setResponseDesc(
                     "Transaction channel is not editable"
             );
 
+            TxnControlsSetResponse.Channel responseChannel =
+                    new TxnControlsSetResponse.Channel();
+
+            responseChannel.setChannelType(
+                    control.getChannelType()
+            );
+
+            responseChannel.setAllowed(
+                    control.isAllowed()
+            );
+
+            responseChannel.setEditable(
+                    control.isEditable()
+            );
+
+            response.setChannel(responseChannel);
+
             return response;
         }
 
-        /*
-        * No-op:
-        * requested value is already the effective value.
-        */
+        // No-op: requested value is already the current value
         if (control.isAllowed() == requestedAllowed) {
 
             TxnControlsSetResponse.Channel responseChannel =
@@ -230,15 +230,19 @@ public class TxnControlsSetServiceImpl
             responseChannel.setChannelType(
                     control.getChannelType()
             );
+
             responseChannel.setAllowed(
                     control.isAllowed()
             );
+
             responseChannel.setEditable(
                     control.isEditable()
             );
 
             response.setChannel(responseChannel);
+
             response.setResponseCode("00");
+
             response.setResponseDesc(
                     "Transaction control already has the requested value"
             );
@@ -246,25 +250,7 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        /*
-        * Apply requested value.
-        *
-        * If the requested value is already the current value,
-        * treat the request as a successful no-op.
-        */
-        if (control.isAllowed() == requestedAllowed) {
-
-        log.info(
-                "Transaction control already has requested value " +
-                "requestId={} cardId={} channelType={} allowed={}",
-                requestId,
-                cardId,
-                channelType,
-                requestedAllowed
-        );
-
-        } else {
-
+        // Apply requested value
         control.setAllowed(requestedAllowed);
 
         transactionControlRepository.save(control);
@@ -277,26 +263,19 @@ public class TxnControlsSetServiceImpl
                 channelType,
                 requestedAllowed
         );
-        }
-        
-        log.info(
-                "Transaction control updated successfully " +
-                "requestId={} cardId={} channelType={} allowed={}",
-                requestId,
-                cardId,
-                channelType,
-                requestedAllowed
-        );
 
+        // Build successful response
         TxnControlsSetResponse.Channel responseChannel =
                 new TxnControlsSetResponse.Channel();
 
         responseChannel.setChannelType(
                 control.getChannelType()
         );
+
         responseChannel.setAllowed(
                 control.isAllowed()
         );
+
         responseChannel.setEditable(
                 control.isEditable()
         );
@@ -304,6 +283,7 @@ public class TxnControlsSetServiceImpl
         response.setChannel(responseChannel);
 
         response.setResponseCode("00");
+
         response.setResponseDesc(
                 "Transaction control updated successfully"
         );

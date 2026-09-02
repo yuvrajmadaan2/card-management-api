@@ -3,12 +3,18 @@ package com.wizz.card_management.dto.request;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
+
 
 public class TxnControlsSetRequest {
 
     @NotBlank(message = "cardId must not be blank")
+    @Size(max = 20, message = "cardId must not exceed 20 characters")
     private String cardId;
 
+    @Size(max = 20, message = "customerId must not exceed 20 characters")
     private String customerId;
 
     @Valid
