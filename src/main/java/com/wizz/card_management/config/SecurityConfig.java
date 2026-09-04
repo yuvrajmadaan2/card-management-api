@@ -1,20 +1,23 @@
 package com.wizz.card_management.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Configuration
 public class SecurityConfig {
@@ -25,7 +28,7 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOrigins(
-                List.of("https://portal.partner-forex.com")
+                List.of(allowedOrigin)
         );
 
         config.setAllowedMethods(
@@ -51,25 +54,6 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
-
-        JwtGrantedAuthoritiesConverter authoritiesConverter =
-                new JwtGrantedAuthoritiesConverter();
-
-        authoritiesConverter.setAuthoritiesClaimName("groups");
-        authoritiesConverter.setAuthorityPrefix("SCOPE_");
-
-        JwtAuthenticationConverter converter =
-                new JwtAuthenticationConverter();
-
-        converter.setJwtGrantedAuthoritiesConverter(
-                authoritiesConverter
-        );
-
-        return converter;
-    }
-
-    @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
 
         return (request, response, authenticationException) -> {
@@ -87,12 +71,20 @@ public class SecurityConfig {
             response.setStatus(401);
             response.setContentType("application/json");
 
-            String json =
-                    "{\"referenceId\":\"" +
-                    requestId +
-                    "\",\"responseCode\":\"98\",\"responseDesc\":\"Unauthorized\"}";
+            Map<String, String> body =
+                    new LinkedHashMap<>();
 
-            response.getWriter().write(json);
+            if (requestId != null && !requestId.isBlank()) {
+                body.put("referenceId", requestId);
+            }
+
+            body.put("responseCode", "98");
+            body.put("responseDesc", "Unauthorized");
+
+            new ObjectMapper().writeValue(
+                    response.getWriter(),
+                    body
+            );
         };
     }
 
@@ -114,12 +106,20 @@ public class SecurityConfig {
             response.setStatus(403);
             response.setContentType("application/json");
 
-            String json =
-                    "{\"referenceId\":\"" +
-                    requestId +
-                    "\",\"responseCode\":\"98\",\"responseDesc\":\"Forbidden\"}";
+            Map<String, String> body =
+                    new LinkedHashMap<>();
 
-            response.getWriter().write(json);
+            if (requestId != null && !requestId.isBlank()) {
+                body.put("referenceId", requestId);
+            }
+
+            body.put("responseCode", "98");
+            body.put("responseDesc", "Forbidden");
+
+            new ObjectMapper().writeValue(
+                    response.getWriter(),
+                    body
+            );
         };
     }
 
@@ -202,13 +202,14 @@ public class SecurityConfig {
                 )
 
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt ->
-                                jwt.jwtAuthenticationConverter(
-                                        jwtAuthenticationConverter()
-                                )
-                        )
+                        oauth2.jwt(jwt -> {
+                        })
                 );
 
         return http.build();
     }
+
+        @Value("${app.cors.allowed-origin}")
+        private String allowedOrigin;
+
 }

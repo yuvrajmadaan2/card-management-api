@@ -425,4 +425,125 @@ class CardControllerTest {
 
         verifyNoInteractions(cardCreateService);
     }
+        @Test
+        void dataIntegrityViolation_shouldReturn409()
+                throws Exception {
+
+        when(rateLimitService.isAllowed("partner-001"))
+                .thenReturn(true);
+
+        when(cardCreateService.createCard(
+                any(CreateCardRequest.class),
+                eq("REQ-007"),
+                eq("KEY-007"),
+                any(),
+                eq("partner-001")
+        )).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException(
+                        "Duplicate key"
+                )
+        );
+
+        mockMvc.perform(
+                        post("/v1/cards")
+                                .with(request -> {
+                                        request.setUserPrincipal(
+                                                authenticationWithScope()
+                                        );
+                                        return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-007"
+                                )
+                                .header(
+                                        "X-Idempotency-Key",
+                                        "KEY-007"
+                                )
+                                .header(
+                                        "X-Channel",
+                                        "WEB"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(validJson())
+                )
+                .andExpect(
+                        status().isConflict()
+                )
+                .andExpect(
+                        jsonPath("$.responseCode")
+                                .value("09")
+                )
+                .andExpect(
+                        jsonPath("$.referenceId")
+                                .value("REQ-007")
+                );
+        }
+
+        @Test
+        void unexpectedException_shouldReturn500()
+                throws Exception {
+
+        when(rateLimitService.isAllowed("partner-001"))
+                .thenReturn(true);
+
+        when(cardCreateService.createCard(
+                any(CreateCardRequest.class),
+                eq("REQ-008"),
+                eq("KEY-008"),
+                any(),
+                eq("partner-001")
+        )).thenThrow(
+                new RuntimeException("Unexpected test exception")
+        );
+
+        mockMvc.perform(
+                        post("/v1/cards")
+                                .with(request -> {
+                                        request.setUserPrincipal(
+                                                authenticationWithScope()
+                                        );
+                                        return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-008"
+                                )
+                                .header(
+                                        "X-Idempotency-Key",
+                                        "KEY-008"
+                                )
+                                .header(
+                                        "X-Channel",
+                                        "WEB"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(validJson())
+                )
+                .andExpect(
+                        status().isInternalServerError()
+                )
+                .andExpect(
+                        jsonPath("$.responseCode")
+                                .value("99")
+                )
+                .andExpect(
+                        jsonPath("$.referenceId")
+                                .value("REQ-008")
+                )
+                .andExpect(
+                        jsonPath("$.responseDesc")
+                                .value("Internal server error")
+                )
+                .andExpect(
+                        jsonPath("$.trace")
+                                .doesNotExist()
+                );
+        }
+        
+
 }

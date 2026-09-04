@@ -24,9 +24,12 @@ import java.util.UUID;
 @Service
 public class CardCreateServiceImpl implements CardCreateService {
 
-    private static final Logger log = LoggerFactory.getLogger(CardCreateServiceImpl.class);
+    private static final Logger log =
+            LoggerFactory.getLogger(CardCreateServiceImpl.class);
 
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final SecureRandom SECURE_RANDOM =
+            new SecureRandom();
+
     private final CardRepository cardRepository;
     private final CardProgramRepository cardProgramRepository;
     private final IdempotencyRecordRepository idempotencyRecordRepository;
@@ -38,58 +41,54 @@ public class CardCreateServiceImpl implements CardCreateService {
 
         this.cardRepository = cardRepository;
         this.cardProgramRepository = cardProgramRepository;
-        this.idempotencyRecordRepository = idempotencyRecordRepository;
+        this.idempotencyRecordRepository =
+                idempotencyRecordRepository;
     }
 
-        @Transactional
-        @Override
-        public CreateCardResponse createCard(
-                CreateCardRequest request,
-                String requestId,
-                String idempotencyKey,
-                String channel,
-                String partnerId) {
+    @Transactional
+    @Override
+    public CreateCardResponse createCard(
+            CreateCardRequest request,
+            String requestId,
+            String idempotencyKey,
+            String channel,
+            String partnerId) {
 
+        log.info(
+                "Creating card requestId={} partnerId={} idempotencyKey={}",
+                requestId,
+                partnerId,
+                idempotencyKey
+        );
 
+        // Extract request data
+        String programId =
+                request.getCard().getCardProgramId();
 
-                log.info(
-                        "Creating card requestId={} partnerId={} idempotencyKey={}",
-                        requestId,
-                        partnerId,
-                        idempotencyKey
-                );
+        String programType =
+                request.getCard().getCardProgramType();
 
-       
+        String cardType =
+                request.getCard().getCardType();
 
-        //  Extract request data
-
-
-        String programId = request.getCard().getCardProgramId();
-        String programType = request.getCard().getCardProgramType();
-        String cardType = request.getCard().getCardType();
-
-
-        //  Create request hash for idempotency
-
-
+        // Create request hash for idempotency
         String requestData =
                 programType + "|" +
                 cardType + "|" +
                 programId;
 
-        String requestHash = HashUtil.sha256(requestData);
-
+        String requestHash =
+                HashUtil.sha256(requestData);
 
         // Check existing idempotency key
-
-
         Optional<IdempotencyRecord> existingRecord =
                 idempotencyRecordRepository
                         .findByIdempotencyKey(idempotencyKey);
 
         if (existingRecord.isPresent()) {
 
-            IdempotencyRecord record = existingRecord.get();
+            IdempotencyRecord record =
+                    existingRecord.get();
 
             // Same key + different request = conflict
             if (!record.getRequestHash().equals(requestHash)) {
@@ -100,75 +99,108 @@ public class CardCreateServiceImpl implements CardCreateService {
             return buildResponseFromRecord(record);
         }
 
-
-        //  Validate card program
-
-
-        CardProgram cardProgram = cardProgramRepository
-                .findByProgramId(programId)
-                .orElse(null);
+        // Validate card program
+        CardProgram cardProgram =
+                cardProgramRepository
+                        .findByProgramId(programId)
+                        .orElse(null);
 
         if (cardProgram == null) {
 
-            CreateCardResponse response = new CreateCardResponse();
+            CreateCardResponse response =
+                    new CreateCardResponse();
 
             response.setReferenceId(requestId);
             response.setResponseCode("10");
-            response.setResponseDesc("Invalid card program ID");
+            response.setResponseDesc(
+                    "Invalid card program ID"
+            );
+
+            log.warn(
+                    "Card creation declined requestId={} partnerId={} reason={}",
+                    requestId,
+                    partnerId,
+                    response.getResponseDesc()
+            );
+
+            saveIdempotencyRecord(
+                    idempotencyKey,
+                    requestHash,
+                    response
+            );
 
             return response;
         }
 
-
-        //  Check program active
-
-
+        // Check program active
         if (!cardProgram.isActive()) {
 
-            CreateCardResponse response = new CreateCardResponse();
+            CreateCardResponse response =
+                    new CreateCardResponse();
 
             response.setReferenceId(requestId);
             response.setResponseCode("10");
-            response.setResponseDesc("Card program is inactive");
+            response.setResponseDesc(
+                    "Card program is inactive"
+            );
+
+            log.warn(
+                    "Card creation declined requestId={} partnerId={} reason={}",
+                    requestId,
+                    partnerId,
+                    response.getResponseDesc()
+            );
+
+            saveIdempotencyRecord(
+                    idempotencyKey,
+                    requestHash,
+                    response
+            );
 
             return response;
         }
 
-
-        //  Check program type
-
-
+        // Check program type
         if (!cardProgram.getProgramType().equals(programType)) {
 
-            CreateCardResponse response = new CreateCardResponse();
+            CreateCardResponse response =
+                    new CreateCardResponse();
 
             response.setReferenceId(requestId);
             response.setResponseCode("10");
-            response.setResponseDesc("Card program type mismatch");
+            response.setResponseDesc(
+                    "Card program type mismatch"
+            );
+
+            log.warn(
+                    "Card creation declined requestId={} partnerId={} reason={}",
+                    requestId,
+                    partnerId,
+                    response.getResponseDesc()
+            );
+
+            saveIdempotencyRecord(
+                    idempotencyKey,
+                    requestHash,
+                    response
+            );
 
             return response;
         }
 
+        // Generate card ID
+        String cardId =
+                UUID.randomUUID().toString();
 
-        //  Generate card ID
-
-
-        String cardId = UUID.randomUUID().toString();
-
-
-        //  Generate demo card number
-
-
-        String cardNumber = "411111111111" +
+        // Generate demo card number
+        String cardNumber =
+                "411111111111" +
                 String.format(
                         "%04d",
                         SECURE_RANDOM.nextInt(10000)
                 );
 
-
-        //  Mask card number
-
-
+        // Mask card number
         String maskedCardNumber =
                 cardNumber.substring(0, 4)
                         + "XXXXXXXX"
@@ -176,16 +208,10 @@ public class CardCreateServiceImpl implements CardCreateService {
                                 cardNumber.length() - 4
                         );
 
-
-        //  Generate expiry date
-
-
+        // Generate expiry date
         String expiryDate = "07/2031";
 
-
-        //  Create Card entity
-
-
+        // Create Card entity
         Card card = new Card();
 
         card.setCardId(cardId);
@@ -196,11 +222,9 @@ public class CardCreateServiceImpl implements CardCreateService {
         card.setExpiryDate(expiryDate);
         card.setCardStatus("A");
 
-
-        //  Save card
-
-
+        // Save card
         cardRepository.save(card);
+
         log.info(
                 "Card created successfully requestId={} partnerId={} cardId={}",
                 requestId,
@@ -208,45 +232,52 @@ public class CardCreateServiceImpl implements CardCreateService {
                 cardId
         );
 
-        //  Create API response
+        // Create API response
+        String referenceId =
+                requestId != null
+                        ? requestId
+                        : UUID.randomUUID().toString();
 
-
-        String referenceId = requestId != null
-                ? requestId
-                : UUID.randomUUID().toString();
-
-        CreateCardResponse response = new CreateCardResponse();
+        CreateCardResponse response =
+                new CreateCardResponse();
 
         response.setCardNumber(maskedCardNumber);
         response.setExpiryDate(expiryDate);
         response.setCardId(cardId);
         response.setReferenceId(referenceId);
         response.setResponseCode("00");
-        response.setResponseDesc("Card created successfully");
+        response.setResponseDesc(
+                "Card created successfully"
+        );
 
+        // Save idempotency record
+        saveIdempotencyRecord(
+                idempotencyKey,
+                requestHash,
+                response
+        );
 
-        //  Save idempotency record
+        return response;
+    }
 
+    private void saveIdempotencyRecord(
+            String idempotencyKey,
+            String requestHash,
+            CreateCardResponse response) {
 
-        IdempotencyRecord record = new IdempotencyRecord();
+        IdempotencyRecord record =
+                new IdempotencyRecord();
 
         record.setIdempotencyKey(idempotencyKey);
         record.setRequestHash(requestHash);
-        record.setCardNumber(maskedCardNumber);
-        record.setExpiryDate(expiryDate);
-        record.setCardId(cardId);
-        record.setReferenceId(referenceId);
-        record.setResponseCode("00");
-        record.setResponseDesc("Card created successfully");
+        record.setCardNumber(response.getCardNumber());
+        record.setExpiryDate(response.getExpiryDate());
+        record.setCardId(response.getCardId());
+        record.setReferenceId(response.getReferenceId());
+        record.setResponseCode(response.getResponseCode());
+        record.setResponseDesc(response.getResponseDesc());
 
         idempotencyRecordRepository.save(record);
-
-
-        // Return response
-
-
-        return response;
-        
     }
 
     private CreateCardResponse buildResponseFromRecord(

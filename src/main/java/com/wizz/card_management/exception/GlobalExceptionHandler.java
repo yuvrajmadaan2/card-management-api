@@ -4,9 +4,14 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.springframework.dao.DataIntegrityViolationException;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -17,6 +22,11 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(
+                    GlobalExceptionHandler.class
+            );
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
             MethodArgumentNotValidException exception,
@@ -26,21 +36,31 @@ public class GlobalExceptionHandler {
                 .getFieldErrors()
                 .stream()
                 .map(error ->
-                        error.getField() + ": " + error.getDefaultMessage())
+                        error.getField()
+                                + ": "
+                                + error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
 
-        String requestId = request.getHeader("X-Request-Id");
+        String requestId =
+                request.getHeader("X-Request-Id");
 
-        ErrorResponse response = new ErrorResponse(
-                requestId,
-                "01",
-                message
-        );
+        ErrorResponse response =
+                new ErrorResponse(
+                        requestId,
+                        "01",
+                        message
+                );
 
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .header("X-Request-Id", requestId)
-                .body(response);
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.status(
+                        HttpStatus.BAD_REQUEST
+                );
+
+        if (requestId != null && !requestId.isBlank()) {
+            builder.header("X-Request-Id", requestId);
+        }
+
+        return builder.body(response);
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
@@ -48,19 +68,24 @@ public class GlobalExceptionHandler {
             MissingRequestHeaderException exception,
             HttpServletRequest request) {
 
-        String requestId = request.getHeader("X-Request-Id");
+        String requestId =
+                request.getHeader("X-Request-Id");
 
         String message =
-                exception.getHeaderName() + " header is required";
+                exception.getHeaderName()
+                        + " header is required";
 
-        ErrorResponse response = new ErrorResponse(
-                requestId,
-                "01",
-                message
-        );
+        ErrorResponse response =
+                new ErrorResponse(
+                        requestId,
+                        "01",
+                        message
+                );
 
         ResponseEntity.BodyBuilder builder =
-                ResponseEntity.status(HttpStatus.BAD_REQUEST);
+                ResponseEntity.status(
+                        HttpStatus.BAD_REQUEST
+                );
 
         if (requestId != null && !requestId.isBlank()) {
             builder.header("X-Request-Id", requestId);
@@ -74,18 +99,26 @@ public class GlobalExceptionHandler {
             IdempotencyConflictException exception,
             HttpServletRequest request) {
 
-        String requestId = request.getHeader("X-Request-Id");
+        String requestId =
+                request.getHeader("X-Request-Id");
 
-        ErrorResponse response = new ErrorResponse(
-                requestId,
-                "09",
-                exception.getMessage()
-        );
+        ErrorResponse response =
+                new ErrorResponse(
+                        requestId,
+                        "09",
+                        exception.getMessage()
+                );
 
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .header("X-Request-Id", requestId)
-                .body(response);
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.status(
+                        HttpStatus.CONFLICT
+                );
+
+        if (requestId != null && !requestId.isBlank()) {
+            builder.header("X-Request-Id", requestId);
+        }
+
+        return builder.body(response);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -93,41 +126,61 @@ public class GlobalExceptionHandler {
             DataIntegrityViolationException exception,
             HttpServletRequest request) {
 
-        String requestId = request.getHeader("X-Request-Id");
+        String requestId =
+                request.getHeader("X-Request-Id");
 
-        ErrorResponse response = new ErrorResponse(
-                requestId,
-                "09",
-                "Idempotency key conflict"
-        );
-
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .header("X-Request-Id", requestId)
-                .body(response);
-    }
-        @ExceptionHandler(Exception.class)
-        public ResponseEntity<ErrorResponse> handleInternalException(
-                Exception exception,
-                HttpServletRequest request) {
-
-        String requestId = request.getHeader("X-Request-Id");
-
-        ErrorResponse response = new ErrorResponse(
-                requestId,
-                "99",
-                "Internal server error"
-        );
+        ErrorResponse response =
+                new ErrorResponse(
+                        requestId,
+                        "09",
+                        "Idempotency key conflict"
+                );
 
         ResponseEntity.BodyBuilder builder =
-                ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR);
+                ResponseEntity.status(
+                        HttpStatus.CONFLICT
+                );
 
         if (requestId != null && !requestId.isBlank()) {
-                builder.header("X-Request-Id", requestId);
+            builder.header("X-Request-Id", requestId);
         }
 
         return builder.body(response);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleInternalException(
+            Exception exception,
+            HttpServletRequest request) {
+
+        String requestId =
+                request.getHeader("X-Request-Id");
+
+        log.error(
+                "Unexpected error requestId={}",
+                requestId,
+                exception
+        );
+
+        ErrorResponse response =
+                new ErrorResponse(
+                        requestId,
+                        "99",
+                        "Internal server error"
+                );
+
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.status(
+                        HttpStatus.INTERNAL_SERVER_ERROR
+                );
+
+        if (requestId != null && !requestId.isBlank()) {
+            builder.header("X-Request-Id", requestId);
         }
+
+        return builder.body(response);
+    }
+
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ErrorResponse {
 
