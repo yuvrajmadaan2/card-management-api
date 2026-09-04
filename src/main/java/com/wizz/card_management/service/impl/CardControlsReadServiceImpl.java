@@ -138,7 +138,7 @@ public class CardControlsReadServiceImpl
                     && !requestedCustomerId.equals(
                             card.getCustomerId())) {
 
-                log.info(
+                log.warn(
                         "Customer-card ownership mismatch " +
                         "requestId={} cardId={}",
                         requestId,
@@ -181,6 +181,11 @@ public class CardControlsReadServiceImpl
          */
         if (results.isEmpty()) {
 
+                log.warn(
+                        "No transaction controls found requestId={} partnerId={}",
+                        requestId,
+                        partnerId
+                );
             response.setResponseCode("10");
             response.setResponseDesc(
                     "No transaction controls found"

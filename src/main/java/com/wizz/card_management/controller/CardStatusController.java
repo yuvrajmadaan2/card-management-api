@@ -89,6 +89,7 @@ public class CardStatusController {
             return ResponseEntity
                     .status(429)
                     .header("X-Request-Id", requestId)
+                    .header("Retry-After", "60")
                     .build();
         }
 

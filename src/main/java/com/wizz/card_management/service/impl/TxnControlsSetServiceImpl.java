@@ -86,6 +86,13 @@ public class TxnControlsSetServiceImpl
         // Validate channel type
         if (!VALID_CHANNEL_TYPES.contains(channelType)) {
 
+                log.warn(
+                        "Invalid transaction channel type requestId={} cardId={} channelType={}",
+                        requestId,
+                        cardId,
+                        channelType
+                );
+
             response.setResponseCode("01");
 
             response.setResponseDesc(
@@ -97,6 +104,13 @@ public class TxnControlsSetServiceImpl
 
         // DOM is not editable
         if ("DOM".equals(channelType)) {
+
+                log.warn(
+                        "Transaction channel not editable requestId={} cardId={} channelType={}",
+                        requestId,
+                        cardId,
+                        channelType
+                );
 
             response.setResponseCode("31");
 
@@ -114,7 +128,7 @@ public class TxnControlsSetServiceImpl
 
         if (card == null) {
 
-            log.info(
+            log.warn(
                     "Card not found requestId={} cardId={}",
                     requestId,
                     cardId
@@ -138,7 +152,7 @@ public class TxnControlsSetServiceImpl
                 && !requestedCustomerId.equals(
                         card.getCustomerId())) {
 
-            log.info(
+            log.warn(
                     "Customer-card ownership mismatch " +
                     "requestId={} cardId={}",
                     requestId,
@@ -160,6 +174,13 @@ public class TxnControlsSetServiceImpl
                 || "R".equals(card.getCardStatus())
                 || "I".equals(card.getCardStatus())) {
 
+                log.warn(
+                        "Transaction control update declined due to card status " +
+                        "requestId={} cardId={} cardStatus={}",
+                        requestId,
+                        cardId,
+                        card.getCardStatus()
+                );
             response.setResponseCode("31");
 
             response.setResponseDesc(
@@ -169,7 +190,8 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        // Find existing control
+        boolean controlExists = true;
+
         TransactionControl control =
                 transactionControlRepository
                         .findByCardIdAndChannelType(
@@ -177,9 +199,10 @@ public class TxnControlsSetServiceImpl
                                 channelType
                         )
                         .orElse(null);
-
         // If no persisted control exists, create one
         if (control == null) {
+
+            controlExists = false;
 
             control = new TransactionControl();
 
@@ -194,6 +217,14 @@ public class TxnControlsSetServiceImpl
 
         // Protect non-editable controls
         if (!control.isEditable()) {
+
+                log.warn(
+                        "Transaction control update declined because control is not editable " +
+                        "requestId={} cardId={} channelType={}",
+                        requestId,
+                        cardId,
+                        channelType
+                );
 
             response.setResponseCode("31");
 
@@ -222,7 +253,7 @@ public class TxnControlsSetServiceImpl
         }
 
         // No-op: requested value is already the current value
-        if (control.isAllowed() == requestedAllowed) {
+        if (controlExists && control.isAllowed() == requestedAllowed) {
 
             TxnControlsSetResponse.Channel responseChannel =
                     new TxnControlsSetResponse.Channel();

@@ -193,6 +193,7 @@ public class CardCreateServiceImpl implements CardCreateService {
                 UUID.randomUUID().toString();
 
         // Generate demo card number
+        // TODO: replace with M2P processor call for production card issuance
         String cardNumber =
                 "411111111111" +
                 String.format(

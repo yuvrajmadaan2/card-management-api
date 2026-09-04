@@ -71,6 +71,12 @@ public class CardStatusUpdateServiceImpl
          */
         if (!VALID_STATUS_CODES.contains(requestedStatus)) {
 
+                log.warn(
+                        "Invalid card status requestId={} cardId={} requestedStatus={}",
+                        requestId,
+                        cardId,
+                        requestedStatus
+                );
             response.setResponseCode("01");
             response.setResponseDesc(
                     "Invalid card status code"
@@ -85,7 +91,12 @@ public class CardStatusUpdateServiceImpl
         if (requiresReasonCode(requestedStatus)
                 && (reasonCode == null
                 || reasonCode.isBlank())) {
-
+                log.warn(
+                        "Missing reason code requestId={} cardId={} requestedStatus={}",
+                        requestId,
+                        cardId,
+                        requestedStatus
+                );
             response.setResponseCode("02");
             response.setResponseDesc(
                     "Reason code is mandatory for the requested card status"
@@ -102,7 +113,7 @@ public class CardStatusUpdateServiceImpl
 
         if (cardOptional.isEmpty()) {
 
-            log.info(
+            log.warn(
                     "Card not found requestId={} cardId={}",
                     requestId,
                     cardId
@@ -148,7 +159,13 @@ public class CardStatusUpdateServiceImpl
          * here without inventing undocumented transitions.
          */
         if (isTerminalStatus(currentStatus)) {
-
+                log.warn(
+                        "Invalid card status transition requestId={} cardId={} currentStatus={} requestedStatus={}",
+                        requestId,
+                        cardId,
+                        currentStatus,
+                        requestedStatus
+                );
             response.setResponseCode("31");
             response.setResponseDesc(
                     "Invalid card status transition"

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -18,6 +19,8 @@ import org.springframework.beans.factory.annotation.Value;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.config.Customizer;
+import org.springframework.http.MediaType;
 
 @Configuration
 public class SecurityConfig {
@@ -53,76 +56,55 @@ public class SecurityConfig {
         return source;
     }
 
-    @Bean
-    public AuthenticationEntryPoint authenticationEntryPoint() {
+        @Bean
+        public AuthenticationEntryPoint authenticationEntryPoint() {
+        return (request, response, ex) -> {
+                String requestId = request.getHeader("X-Request-Id");
 
-        return (request, response, authenticationException) -> {
+                if (requestId != null) {
+                response.setHeader("X-Request-Id", requestId);
+                }
 
-            String requestId =
-                    request.getHeader("X-Request-Id");
+                response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-            if (requestId != null && !requestId.isBlank()) {
-                response.setHeader(
-                        "X-Request-Id",
-                        requestId
-                );
-            }
+                Map<String, String> body = new LinkedHashMap<>();
 
-            response.setStatus(401);
-            response.setContentType("application/json");
-
-            Map<String, String> body =
-                    new LinkedHashMap<>();
-
-            if (requestId != null && !requestId.isBlank()) {
+                if (requestId != null) {
                 body.put("referenceId", requestId);
-            }
+                }
 
-            body.put("responseCode", "98");
-            body.put("responseDesc", "Unauthorized");
+                body.put("responseCode", "98");
+                body.put("responseDesc", "Unauthorized");
 
-            new ObjectMapper().writeValue(
-                    response.getWriter(),
-                    body
-            );
+                new ObjectMapper().writeValue(response.getWriter(), body);
         };
-    }
+        }
 
-    @Bean
-    public AccessDeniedHandler accessDeniedHandler() {
+        @Bean
+        public AccessDeniedHandler accessDeniedHandler() {
+        return (request, response, ex) -> {
+                String requestId = request.getHeader("X-Request-Id");
 
-        return (request, response, accessDeniedException) -> {
+                if (requestId != null) {
+                response.setHeader("X-Request-Id", requestId);
+                }
 
-            String requestId =
-                    request.getHeader("X-Request-Id");
+                response.setStatus(HttpStatus.FORBIDDEN.value());
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-            if (requestId != null && !requestId.isBlank()) {
-                response.setHeader(
-                        "X-Request-Id",
-                        requestId
-                );
-            }
+                Map<String, String> body = new LinkedHashMap<>();
 
-            response.setStatus(403);
-            response.setContentType("application/json");
-
-            Map<String, String> body =
-                    new LinkedHashMap<>();
-
-            if (requestId != null && !requestId.isBlank()) {
+                if (requestId != null) {
                 body.put("referenceId", requestId);
-            }
+                }
 
-            body.put("responseCode", "98");
-            body.put("responseDesc", "Forbidden");
+                body.put("responseCode", "98");
+                body.put("responseDesc", "Forbidden");
 
-            new ObjectMapper().writeValue(
-                    response.getWriter(),
-                    body
-            );
+                new ObjectMapper().writeValue(response.getWriter(), body);
         };
-    }
-
+        }
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http) throws Exception {
@@ -202,8 +184,7 @@ public class SecurityConfig {
                 )
 
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt -> {
-                        })
+                        oauth2.jwt(Customizer.withDefaults())
                 );
 
         return http.build();

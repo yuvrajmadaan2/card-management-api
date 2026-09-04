@@ -14,6 +14,7 @@ public class TxnControlsFetchRequest {
     @Valid
     private List<CardRef> cards;
 
+    @Size(max = 20)
     private String customerId;
 
     public List<CardRef> getCards() {
@@ -35,6 +36,7 @@ public class TxnControlsFetchRequest {
     public static class CardRef {
 
         @NotBlank(message = "cardId must not be blank")
+        @Size(max = 20)
         private String cardId;
 
         public String getCardId() {
