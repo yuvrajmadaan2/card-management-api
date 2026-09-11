@@ -211,7 +211,7 @@ class TxnControlsSetServiceImplTest {
     }
 
     @Test
-    void setTransactionControl_domChannel_returns31() {
+    void setTransactionControl_domChannel_returns60() {
 
         TxnControlsSetRequest request =
                 createRequest(
@@ -230,12 +230,12 @@ class TxnControlsSetServiceImplTest {
                 );
 
         assertEquals(
-                "31",
+                "60",
                 response.getResponseCode()
         );
 
         assertEquals(
-                "Transaction channel is not editable",
+                "Control locked by program policy — change not permitted",
                 response.getResponseDesc()
         );
 
@@ -439,12 +439,12 @@ class TxnControlsSetServiceImplTest {
                 );
 
         assertEquals(
-                "31",
+                "60",
                 response.getResponseCode()
         );
 
         assertEquals(
-                "Transaction channel is not editable",
+                "Control locked by program policy — change not permitted",
                 response.getResponseDesc()
         );
 

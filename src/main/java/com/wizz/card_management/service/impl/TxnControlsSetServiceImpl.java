@@ -112,10 +112,10 @@ public class TxnControlsSetServiceImpl
                         channelType
                 );
 
-            response.setResponseCode("31");
+            response.setResponseCode("60");
 
             response.setResponseDesc(
-                    "Transaction channel is not editable"
+                    "Control locked by program policy — change not permitted"
             );
 
             return response;
@@ -226,10 +226,10 @@ public class TxnControlsSetServiceImpl
                         channelType
                 );
 
-            response.setResponseCode("31");
+            response.setResponseCode("60");
 
             response.setResponseDesc(
-                    "Transaction channel is not editable"
+                    "Control locked by program policy — change not permitted"
             );
 
             TxnControlsSetResponse.Channel responseChannel =
