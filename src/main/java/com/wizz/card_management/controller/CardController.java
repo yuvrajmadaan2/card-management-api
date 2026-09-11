@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import com.wizz.card_management.ratelimit.RateLimitService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 @RestController
 @RequestMapping("/v1/cards")
@@ -87,6 +90,7 @@ public class CardController {
         return ResponseEntity
                 .status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("X-Request-Id", requestId)
+                .header("Retry-After", "60")
                 .build();
         }                
 

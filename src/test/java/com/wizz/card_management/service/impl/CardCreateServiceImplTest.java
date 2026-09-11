@@ -1,6 +1,5 @@
 package com.wizz.card_management.service.impl;
 
-
 import com.wizz.card_management.dto.request.CreateCardRequest;
 import com.wizz.card_management.dto.response.CreateCardResponse;
 import com.wizz.card_management.entity.Card;
@@ -24,6 +23,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -76,11 +77,13 @@ class CardCreateServiceImplTest {
                 .thenReturn(Optional.of(program));
 
         when(cardRepository.save(any(Card.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
 
         when(idempotencyRecordRepository.save(
                 any(IdempotencyRecord.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
 
         CreateCardResponse response =
                 cardCreateService.createCard(
@@ -91,11 +94,16 @@ class CardCreateServiceImplTest {
                         "partner-001"
                 );
 
-        assertEquals("00", response.getResponseCode());
+        assertEquals(
+                "00",
+                response.getResponseCode()
+        );
+
         assertEquals(
                 "Card created successfully",
                 response.getResponseDesc()
         );
+
         assertEquals(
                 "REQ-001",
                 response.getReferenceId()
@@ -103,6 +111,7 @@ class CardCreateServiceImplTest {
 
         assertNotNull(response.getCardId());
         assertNotNull(response.getCardNumber());
+
         assertEquals(
                 "07/2031",
                 response.getExpiryDate()
@@ -152,6 +161,19 @@ class CardCreateServiceImplTest {
 
         verify(cardRepository, never())
                 .save(any(Card.class));
+
+        verify(idempotencyRecordRepository)
+                .save(argThat(record ->
+                        "KEY-002".equals(
+                                record.getIdempotencyKey()
+                        )
+                        && "10".equals(
+                                record.getResponseCode()
+                        )
+                        && "Invalid card program ID".equals(
+                                record.getResponseDesc()
+                        )
+                ));
     }
 
     @Test
@@ -197,6 +219,19 @@ class CardCreateServiceImplTest {
 
         verify(cardRepository, never())
                 .save(any(Card.class));
+
+        verify(idempotencyRecordRepository)
+                .save(argThat(record ->
+                        "KEY-003".equals(
+                                record.getIdempotencyKey()
+                        )
+                        && "10".equals(
+                                record.getResponseCode()
+                        )
+                        && "Card program is inactive".equals(
+                                record.getResponseDesc()
+                        )
+                ));
     }
 
     @Test
@@ -242,6 +277,19 @@ class CardCreateServiceImplTest {
 
         verify(cardRepository, never())
                 .save(any(Card.class));
+
+        verify(idempotencyRecordRepository)
+                .save(argThat(record ->
+                        "KEY-004".equals(
+                                record.getIdempotencyKey()
+                        )
+                        && "10".equals(
+                                record.getResponseCode()
+                        )
+                        && "Card program type mismatch".equals(
+                                record.getResponseDesc()
+                        )
+                ));
     }
 
     @Test
@@ -296,6 +344,53 @@ class CardCreateServiceImplTest {
                 .findByProgramId(anyString());
     }
 
+        @Test
+        void sameIdempotencyKeyWithDifferentRequestId_shouldReplayOriginalReferenceId() {
+
+        String requestData =
+                "D|V|PROGRAM-001";
+
+        IdempotencyRecord record =
+                createIdempotencyRecord(
+                        "KEY-007",
+                        HashUtil.sha256(requestData)
+                );
+
+        when(idempotencyRecordRepository
+                .findByIdempotencyKey("KEY-007"))
+                .thenReturn(Optional.of(record));
+
+        CreateCardResponse response =
+                cardCreateService.createCard(
+                        request,
+                        "REQ-999",
+                        "KEY-007",
+                        "WEB",
+                        "partner-001"
+                );
+
+        assertEquals(
+                "00",
+                response.getResponseCode()
+        );
+
+        assertEquals(
+                "REQ-005",
+                response.getReferenceId()
+        );
+
+        assertEquals(
+                "CARD-001",
+                response.getCardId()
+        );
+
+        verify(cardRepository, never())
+                .save(any(Card.class));
+
+        verify(cardProgramRepository, never())
+                .findByProgramId(anyString());
+        }
+
     @Test
     void sameIdempotencyKeyAndDifferentRequest_shouldThrowConflict() {
 
@@ -335,7 +430,8 @@ class CardCreateServiceImplTest {
             String programType,
             boolean active) {
 
-        CardProgram program = new CardProgram();
+        CardProgram program =
+                new CardProgram();
 
         program.setProgramId(programId);
         program.setProgramName("Test Program");

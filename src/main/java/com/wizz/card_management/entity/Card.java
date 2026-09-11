@@ -25,6 +25,12 @@ public class Card {
 
     private String cardStatus;
 
+    private String nameOnCard;
+
+    private String customerId;
+
+    private String issuedDate;
+
     // Getters and Setters
 
     public Long getId() {
@@ -89,5 +95,29 @@ public class Card {
 
     public void setCardStatus(String cardStatus) {
         this.cardStatus = cardStatus;
+    }
+
+    public String getNameOnCard() {
+        return nameOnCard;
+    }
+
+    public void setNameOnCard(String nameOnCard) {
+        this.nameOnCard = nameOnCard;
+    }
+
+    public String getCustomerId() {
+        return customerId;
+    }
+
+    public void setCustomerId(String customerId) {
+        this.customerId = customerId;
+    }
+
+    public String getIssuedDate() {
+        return issuedDate;
+    }
+
+    public void setIssuedDate(String issuedDate) {
+        this.issuedDate = issuedDate;
     }
 }

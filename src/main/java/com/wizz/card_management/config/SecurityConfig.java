@@ -1,20 +1,26 @@
 package com.wizz.card_management.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import org.springframework.security.config.Customizer;
+import org.springframework.http.MediaType;
 
 @Configuration
 public class SecurityConfig {
@@ -25,7 +31,7 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOrigins(
-                List.of("https://portal.partner-forex.com")
+                List.of(allowedOrigin)
         );
 
         config.setAllowedMethods(
@@ -50,79 +56,55 @@ public class SecurityConfig {
         return source;
     }
 
-    @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        @Bean
+        public AuthenticationEntryPoint authenticationEntryPoint() {
+        return (request, response, ex) -> {
+                String requestId = request.getHeader("X-Request-Id");
 
-        JwtGrantedAuthoritiesConverter authoritiesConverter =
-                new JwtGrantedAuthoritiesConverter();
+                if (requestId != null) {
+                response.setHeader("X-Request-Id", requestId);
+                }
 
-        authoritiesConverter.setAuthoritiesClaimName("groups");
-        authoritiesConverter.setAuthorityPrefix("SCOPE_");
+                response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        JwtAuthenticationConverter converter =
-                new JwtAuthenticationConverter();
+                Map<String, String> body = new LinkedHashMap<>();
 
-        converter.setJwtGrantedAuthoritiesConverter(
-                authoritiesConverter
-        );
+                if (requestId != null) {
+                body.put("referenceId", requestId);
+                }
 
-        return converter;
-    }
+                body.put("responseCode", "98");
+                body.put("responseDesc", "Unauthorized");
 
-    @Bean
-    public AuthenticationEntryPoint authenticationEntryPoint() {
-
-        return (request, response, authenticationException) -> {
-
-            String requestId =
-                    request.getHeader("X-Request-Id");
-
-            if (requestId != null && !requestId.isBlank()) {
-                response.setHeader(
-                        "X-Request-Id",
-                        requestId
-                );
-            }
-
-            response.setStatus(401);
-            response.setContentType("application/json");
-
-            String json =
-                    "{\"referenceId\":\"" +
-                    requestId +
-                    "\",\"responseCode\":\"98\",\"responseDesc\":\"Unauthorized\"}";
-
-            response.getWriter().write(json);
+                new ObjectMapper().writeValue(response.getWriter(), body);
         };
-    }
+        }
 
-    @Bean
-    public AccessDeniedHandler accessDeniedHandler() {
+        @Bean
+        public AccessDeniedHandler accessDeniedHandler() {
+        return (request, response, ex) -> {
+                String requestId = request.getHeader("X-Request-Id");
 
-        return (request, response, accessDeniedException) -> {
+                if (requestId != null) {
+                response.setHeader("X-Request-Id", requestId);
+                }
 
-            String requestId =
-                    request.getHeader("X-Request-Id");
+                response.setStatus(HttpStatus.FORBIDDEN.value());
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-            if (requestId != null && !requestId.isBlank()) {
-                response.setHeader(
-                        "X-Request-Id",
-                        requestId
-                );
-            }
+                Map<String, String> body = new LinkedHashMap<>();
 
-            response.setStatus(403);
-            response.setContentType("application/json");
+                if (requestId != null) {
+                body.put("referenceId", requestId);
+                }
 
-            String json =
-                    "{\"referenceId\":\"" +
-                    requestId +
-                    "\",\"responseCode\":\"98\",\"responseDesc\":\"Forbidden\"}";
+                body.put("responseCode", "98");
+                body.put("responseDesc", "Forbidden");
 
-            response.getWriter().write(json);
+                new ObjectMapper().writeValue(response.getWriter(), body);
         };
-    }
-
+        }
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http) throws Exception {
@@ -155,13 +137,37 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/h2-console/**"
                         )
-                        .permitAll()
+                        .denyAll()
 
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/v1/cards"
                         )
                         .hasAuthority("SCOPE_cards:write")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/cards/details"
+                        )
+                        .authenticated()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/cards/setStatus"
+                        )
+                        .authenticated()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/txnControls"
+                        )
+                        .authenticated()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/txnControls/set"
+                        )
+                        .authenticated()
 
                         .anyRequest()
                         .authenticated()
@@ -178,13 +184,13 @@ public class SecurityConfig {
                 )
 
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt ->
-                                jwt.jwtAuthenticationConverter(
-                                        jwtAuthenticationConverter()
-                                )
-                        )
+                        oauth2.jwt(Customizer.withDefaults())
                 );
 
         return http.build();
     }
+
+        @Value("${app.cors.allowed-origin}")
+        private String allowedOrigin;
+
 }

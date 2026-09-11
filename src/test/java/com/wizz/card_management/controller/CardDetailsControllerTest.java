@@ -1,28 +1,26 @@
 package com.wizz.card_management.controller;
 
-import com.wizz.card_management.dto.request.CreateCardRequest;
-import com.wizz.card_management.dto.response.CreateCardResponse;
+import com.wizz.card_management.dto.response.CardDetailsResponse;
 import com.wizz.card_management.ratelimit.RateLimitService;
-import com.wizz.card_management.service.CardCreateService;
+import com.wizz.card_management.service.CardDetailsReadService;
 
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -34,25 +32,25 @@ import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OA
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.web.OAuth2ResourceServerWebSecurityAutoConfiguration;
 
 
-@WebMvcTest(CardController.class)
+@WebMvcTest(CardDetailsController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @ImportAutoConfiguration(exclude = {
         OAuth2ResourceServerAutoConfiguration.class,
         OAuth2ResourceServerWebSecurityAutoConfiguration.class
 })
-class CardControllerTest {
+class CardDetailsControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
-    private CardCreateService cardCreateService;
+    private CardDetailsReadService cardDetailsReadService;
 
     @MockitoBean
     private RateLimitService rateLimitService;
 
 
-    private JwtAuthenticationToken authenticationWithScope() {
+    private JwtAuthenticationToken authentication() {
 
         Jwt jwt = new Jwt(
                 "test-token",
@@ -60,8 +58,7 @@ class CardControllerTest {
                 Instant.now().plusSeconds(3600),
                 Map.of("alg", "none"),
                 Map.of(
-                        "sub", "partner-001",
-                        "scope", "cards:write"
+                        "sub", "partner-001"
                 )
         );
 
@@ -80,11 +77,26 @@ class CardControllerTest {
 
         return """
                 {
-                  "card": {
-                    "cardProgramType": "D",
-                    "cardType": "V",
-                    "cardProgramId": "PROGRAM-001"
-                  }
+                  "cards": [
+                    {
+                      "cardId": "CARD001"
+                    }
+                  ]
+                }
+                """;
+    }
+
+
+    private String validJsonWithCustomerId() {
+
+        return """
+                {
+                  "cards": [
+                    {
+                      "cardId": "CARD001"
+                    }
+                  ],
+                  "customerId": "0012342"
                 }
                 """;
     }
@@ -93,44 +105,37 @@ class CardControllerTest {
     @Test
     void validRequest_shouldReturn200() throws Exception {
 
-        CreateCardResponse response =
-                new CreateCardResponse();
+        CardDetailsResponse response =
+                new CardDetailsResponse();
 
-        response.setCardId("CARD-001");
-        response.setCardNumber("4111XXXXXXXX1111");
-        response.setExpiryDate("07/2031");
         response.setReferenceId("REQ-001");
         response.setResponseCode("00");
         response.setResponseDesc(
-                "Card created successfully"
+                "Card details retrieved successfully"
         );
 
         when(rateLimitService.isAllowed("partner-001"))
                 .thenReturn(true);
 
-        when(cardCreateService.createCard(
-                any(CreateCardRequest.class),
+        when(cardDetailsReadService.getCardDetails(
+                any(),
                 eq("REQ-001"),
-                eq("KEY-001"),
                 eq("WEB"),
                 eq("partner-001")
         )).thenReturn(response);
 
+
         mockMvc.perform(
-                        post("/v1/cards")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
-                                            authenticationWithScope()
+                                            authentication()
                                     );
                                     return request;
                                 })
                                 .header(
                                         "X-Request-Id",
                                         "REQ-001"
-                                )
-                                .header(
-                                        "X-Idempotency-Key",
-                                        "KEY-001"
                                 )
                                 .header(
                                         "X-Channel",
@@ -152,12 +157,16 @@ class CardControllerTest {
                         jsonPath(
                                 "$.responseCode"
                         ).value("00")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.referenceId"
+                        ).value("REQ-001")
                 );
 
-        verify(cardCreateService).createCard(
-                any(CreateCardRequest.class),
+        verify(cardDetailsReadService).getCardDetails(
+                any(),
                 eq("REQ-001"),
-                eq("KEY-001"),
                 eq("WEB"),
                 eq("partner-001")
         );
@@ -165,26 +174,35 @@ class CardControllerTest {
 
 
     @Test
-    void missingRequiredField_shouldReturn400()
+    void cardNotFound_shouldReturn200WithBusinessDecline()
             throws Exception {
+
+        CardDetailsResponse response =
+                new CardDetailsResponse();
+
+        response.setReferenceId("REQ-002");
+        response.setResponseCode("10");
+        response.setResponseDesc(
+                "No card details found"
+        );
+        response.setCards(List.of());
 
         when(rateLimitService.isAllowed("partner-001"))
                 .thenReturn(true);
 
-        String invalidJson = """
-                {
-                  "card": {
-                    "cardProgramType": "D",
-                    "cardType": "V"
-                  }
-                }
-                """;
+        when(cardDetailsReadService.getCardDetails(
+                any(),
+                eq("REQ-002"),
+                eq("WEB"),
+                eq("partner-001")
+        )).thenReturn(response);
+
 
         mockMvc.perform(
-                        post("/v1/cards")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
-                                            authenticationWithScope()
+                                            authentication()
                                     );
                                     return request;
                                 })
@@ -193,8 +211,59 @@ class CardControllerTest {
                                         "REQ-002"
                                 )
                                 .header(
-                                        "X-Idempotency-Key",
-                                        "KEY-002"
+                                        "X-Channel",
+                                        "WEB"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(validJson())
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath(
+                                "$.responseCode"
+                        ).value("10")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.responseDesc"
+                        ).value(
+                                "No card details found"
+                        )
+                );
+    }
+
+
+    @Test
+    void invalidRequest_shouldReturn400()
+            throws Exception {
+
+        when(rateLimitService.isAllowed("partner-001"))
+                .thenReturn(true);
+
+        String invalidJson = """
+                {
+                  "cards": []
+                }
+                """;
+
+
+        mockMvc.perform(
+                        post("/v1/cards/details")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authentication()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-003"
+                                )
+                                .header(
+                                        "X-Channel",
+                                        "WEB"
                                 )
                                 .contentType(
                                         "application/json"
@@ -203,80 +272,11 @@ class CardControllerTest {
                 )
                 .andExpect(
                         status().isBadRequest()
-                )
-                .andExpect(
-                        jsonPath(
-                                "$.responseCode"
-                        ).value("01")
                 );
 
-        verify(cardCreateService, never())
-                .createCard(
-                        any(),
-                        anyString(),
-                        anyString(),
-                        any(),
-                        anyString()
-                );
-    }
-
-
-    @Test
-    void duplicateIdempotency_shouldReturn409()
-            throws Exception {
-
-        when(rateLimitService.isAllowed("partner-001"))
-                .thenReturn(true);
-
-        when(cardCreateService.createCard(
-                any(CreateCardRequest.class),
-                eq("REQ-004"),
-                eq("KEY-004"),
-                any(),
-                eq("partner-001")
-        )).thenThrow(
-                new com.wizz.card_management.exception
-                        .IdempotencyConflictException()
+        verifyNoInteractions(
+                cardDetailsReadService
         );
-
-        mockMvc.perform(
-                        post("/v1/cards")
-                                .with(request -> {
-                                    request.setUserPrincipal(
-                                            authenticationWithScope()
-                                    );
-                                    return request;
-                                })
-                                .header(
-                                        "X-Request-Id",
-                                        "REQ-004"
-                                )
-                                .header(
-                                        "X-Idempotency-Key",
-                                        "KEY-004"
-                                )
-                                .contentType(
-                                        "application/json"
-                                )
-                                .content(validJson())
-                )
-                .andExpect(
-                        status().isConflict()
-                )
-                .andExpect(
-                        jsonPath("$.responseCode")
-                                .value("09")
-                )
-                .andExpect(
-                        jsonPath("$.referenceId")
-                                .value("REQ-004")
-                )
-                .andExpect(
-                        header().string(
-                                "X-Request-Id",
-                                "REQ-004"
-                        )
-                );
     }
 
 
@@ -287,21 +287,22 @@ class CardControllerTest {
         when(rateLimitService.isAllowed("partner-001"))
                 .thenReturn(false);
 
+
         mockMvc.perform(
-                        post("/v1/cards")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
-                                            authenticationWithScope()
+                                            authentication()
                                     );
                                     return request;
                                 })
                                 .header(
                                         "X-Request-Id",
-                                        "REQ-005"
+                                        "REQ-004"
                                 )
                                 .header(
-                                        "X-Idempotency-Key",
-                                        "KEY-005"
+                                        "X-Channel",
+                                        "WEB"
                                 )
                                 .contentType(
                                         "application/json"
@@ -314,29 +315,31 @@ class CardControllerTest {
                 .andExpect(
                         header().string(
                                 "X-Request-Id",
-                                "REQ-005"
+                                "REQ-004"
                         )
                 );
 
-        verifyNoInteractions(cardCreateService);
+        verifyNoInteractions(
+                cardDetailsReadService
+        );
     }
 
 
     @Test
-    void createCard_missingRequestId_shouldReturn400()
+    void missingRequestId_shouldReturn400()
             throws Exception {
 
         mockMvc.perform(
-                        post("/v1/cards")
+                        post("/v1/cards/details")
                                 .with(request -> {
                                     request.setUserPrincipal(
-                                            authenticationWithScope()
+                                            authentication()
                                     );
                                     return request;
                                 })
                                 .header(
-                                        "X-Idempotency-Key",
-                                        "KEY-MISSING-REQUEST-ID"
+                                        "X-Channel",
+                                        "WEB"
                                 )
                                 .contentType(
                                         "application/json"
@@ -347,203 +350,216 @@ class CardControllerTest {
                         status().isBadRequest()
                 );
 
-        verifyNoInteractions(cardCreateService);
+        verifyNoInteractions(
+                cardDetailsReadService
+        );
     }
 
 
     @Test
-    void createCard_missingIdempotencyKey_shouldReturn400()
+    void ownershipMismatch_shouldReturn200WithBusinessDecline()
             throws Exception {
 
-        mockMvc.perform(
-                        post("/v1/cards")
-                                .with(request -> {
-                                    request.setUserPrincipal(
-                                            authenticationWithScope()
-                                    );
-                                    return request;
-                                })
-                                .header(
-                                        "X-Request-Id",
-                                        "REQ-MISSING-IDEMPOTENCY"
-                                )
-                                .contentType(
-                                        "application/json"
-                                )
-                                .content(validJson())
-                )
-                .andExpect(
-                        status().isBadRequest()
-                );
+        CardDetailsResponse response =
+                new CardDetailsResponse();
 
-        verifyNoInteractions(cardCreateService);
-    }
-
-
-    @Test
-    void createCard_invalidCardProgramType_shouldReturn400()
-            throws Exception {
-
-        String invalidJson = """
-                {
-                  "card": {
-                    "cardProgramType": "X",
-                    "cardType": "V",
-                    "cardProgramId": "PROGRAM-001"
-                  }
-                }
-                """;
-
-        mockMvc.perform(
-                        post("/v1/cards")
-                                .with(request -> {
-                                    request.setUserPrincipal(
-                                            authenticationWithScope()
-                                    );
-                                    return request;
-                                })
-                                .header(
-                                        "X-Request-Id",
-                                        "REQ-INVALID-TYPE"
-                                )
-                                .header(
-                                        "X-Idempotency-Key",
-                                        "KEY-INVALID-TYPE"
-                                )
-                                .contentType(
-                                        "application/json"
-                                )
-                                .content(invalidJson)
-                )
-                .andExpect(
-                        status().isBadRequest()
-                )
-                .andExpect(
-                        jsonPath("$.responseCode")
-                                .value("01")
-                );
-
-        verifyNoInteractions(cardCreateService);
-    }
-        @Test
-        void dataIntegrityViolation_shouldReturn409()
-                throws Exception {
+        response.setReferenceId("REQ-005");
+        response.setResponseCode("90");
+        response.setResponseDesc(
+                "Customer–card ownership mismatch — details request declined"
+        );
+        response.setCards(List.of());
 
         when(rateLimitService.isAllowed("partner-001"))
                 .thenReturn(true);
 
-        when(cardCreateService.createCard(
-                any(CreateCardRequest.class),
-                eq("REQ-007"),
-                eq("KEY-007"),
+        when(cardDetailsReadService.getCardDetails(
                 any(),
+                eq("REQ-005"),
+                eq("WEB"),
+                eq("partner-001")
+        )).thenReturn(response);
+
+
+        mockMvc.perform(
+                        post("/v1/cards/details")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authentication()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-005"
+                                )
+                                .header(
+                                        "X-Channel",
+                                        "WEB"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(
+                                        validJsonWithCustomerId()
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        header().string(
+                                "X-Request-Id",
+                                "REQ-005"
+                        )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.responseCode"
+                        ).value("90")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.responseDesc"
+                        ).value(
+                                "Customer–card ownership mismatch — details request declined"
+                        )
+                );
+    }
+
+
+    @Test
+    void partialSuccess_shouldReturn200WithFoundCards()
+            throws Exception {
+
+        CardDetailsResponse response =
+                new CardDetailsResponse();
+
+        response.setReferenceId("REQ-006");
+        response.setResponseCode("00");
+        response.setResponseDesc(
+                "Card details retrieved successfully"
+        );
+
+        CardDetailsResponse.CardDetail detail =
+                new CardDetailsResponse.CardDetail();
+
+        detail.setCardId("CARD001");
+        detail.setCustomerId("0012342");
+        detail.setNameOnCard("Chuck Yeager");
+        detail.setIssuedDate("2026-07-07");
+
+        response.setCards(List.of(detail));
+
+        when(rateLimitService.isAllowed("partner-001"))
+                .thenReturn(true);
+
+        when(cardDetailsReadService.getCardDetails(
+                any(),
+                eq("REQ-006"),
+                eq("WEB"),
+                eq("partner-001")
+        )).thenReturn(response);
+
+
+        mockMvc.perform(
+                        post("/v1/cards/details")
+                                .with(request -> {
+                                    request.setUserPrincipal(
+                                            authentication()
+                                    );
+                                    return request;
+                                })
+                                .header(
+                                        "X-Request-Id",
+                                        "REQ-006"
+                                )
+                                .header(
+                                        "X-Channel",
+                                        "WEB"
+                                )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(
+                                        validJsonWithCustomerId()
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath(
+                                "$.responseCode"
+                        ).value("00")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.cards[0].cardId"
+                        ).value("CARD001")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.cards[0].customerId"
+                        ).value("0012342")
+                );
+    }
+
+    @Test
+    void internalException_shouldReturn500() throws Exception {
+
+        when(rateLimitService.isAllowed("partner-001"))
+                .thenReturn(true);
+
+        when(cardDetailsReadService.getCardDetails(
+                any(),
+                eq("REQ-007"),
+                eq("WEB"),
                 eq("partner-001")
         )).thenThrow(
-                new org.springframework.dao.DataIntegrityViolationException(
-                        "Duplicate key"
-                )
+                new RuntimeException("Database unavailable")
         );
 
         mockMvc.perform(
-                        post("/v1/cards")
+                        post("/v1/cards/details")
                                 .with(request -> {
-                                        request.setUserPrincipal(
-                                                authenticationWithScope()
-                                        );
-                                        return request;
+                                    request.setUserPrincipal(
+                                            authentication()
+                                    );
+                                    return request;
                                 })
                                 .header(
                                         "X-Request-Id",
                                         "REQ-007"
                                 )
                                 .header(
-                                        "X-Idempotency-Key",
-                                        "KEY-007"
-                                )
-                                .header(
                                         "X-Channel",
                                         "WEB"
                                 )
                                 .contentType(
                                         "application/json"
                                 )
-                                .content(validJson())
-                )
-                .andExpect(
-                        status().isConflict()
-                )
-                .andExpect(
-                        jsonPath("$.responseCode")
-                                .value("09")
-                )
-                .andExpect(
-                        jsonPath("$.referenceId")
-                                .value("REQ-007")
-                );
-        }
-
-        @Test
-        void unexpectedException_shouldReturn500()
-                throws Exception {
-
-        when(rateLimitService.isAllowed("partner-001"))
-                .thenReturn(true);
-
-        when(cardCreateService.createCard(
-                any(CreateCardRequest.class),
-                eq("REQ-008"),
-                eq("KEY-008"),
-                any(),
-                eq("partner-001")
-        )).thenThrow(
-                new RuntimeException("Unexpected test exception")
-        );
-
-        mockMvc.perform(
-                        post("/v1/cards")
-                                .with(request -> {
-                                        request.setUserPrincipal(
-                                                authenticationWithScope()
-                                        );
-                                        return request;
-                                })
-                                .header(
-                                        "X-Request-Id",
-                                        "REQ-008"
-                                )
-                                .header(
-                                        "X-Idempotency-Key",
-                                        "KEY-008"
-                                )
-                                .header(
-                                        "X-Channel",
-                                        "WEB"
-                                )
-                                .contentType(
-                                        "application/json"
-                                )
-                                .content(validJson())
+                                .content(validJsonWithCustomerId())
                 )
                 .andExpect(
                         status().isInternalServerError()
                 )
                 .andExpect(
-                        jsonPath("$.responseCode")
-                                .value("99")
+                        header().string(
+                                "X-Request-Id",
+                                "REQ-007"
+                        )
                 )
                 .andExpect(
-                        jsonPath("$.referenceId")
-                                .value("REQ-008")
+                        jsonPath(
+                                "$.referenceId"
+                        ).value("REQ-007")
                 )
                 .andExpect(
-                        jsonPath("$.responseDesc")
-                                .value("Internal server error")
+                        jsonPath(
+                                "$.responseCode"
+                        ).value("99")
                 )
                 .andExpect(
-                        jsonPath("$.trace")
-                                .doesNotExist()
+                        jsonPath(
+                                "$.responseDesc"
+                        ).value("Internal server error")
                 );
-        }
-        
-
+    }
 }

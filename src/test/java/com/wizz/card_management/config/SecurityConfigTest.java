@@ -17,18 +17,22 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 
-@SpringBootTest(
-        properties = {
-                "spring.sql.init.mode=never"
-        }
-)
+
+@SpringBootTest(properties = {
+        "spring.sql.init.mode=never",
+        "OAUTH2_ISSUER_URI=http://127.0.0.1:5556/dex"
+})
 @AutoConfigureMockMvc
 @Import(SecurityConfig.class)
-class SecurityConfigTest {
+class SecurityConfigTest  {
 
     @Autowired
     private MockMvc mockMvc;
+
+        @MockitoBean
+        private JwtDecoder jwtDecoder;
 
     @MockitoBean
     private CardCreateService cardCreateService;
@@ -79,4 +83,42 @@ class SecurityConfigTest {
                 )
         );
     }
+
+        @Test
+        void missingAuthentication_shouldReturn401() throws Exception {
+
+        mockMvc.perform(
+                post("/v1/cards")
+                        .header(
+                                "X-Request-Id",
+                                "REQ-SEC-002"
+                        )
+                        .header(
+                                "X-Idempotency-Key",
+                                "KEY-SEC-002"
+                        )
+                        .contentType(
+                                "application/json"
+                        )
+                        .content("""
+                                {
+                                "card": {
+                                        "cardProgramType": "D",
+                                        "cardType": "V",
+                                        "cardProgramId": "PROGRAM-001"
+                                }
+                                }
+                                """)
+        )
+        .andExpect(
+                status().isUnauthorized()
+        )
+        .andExpect(
+                header().string(
+                        "X-Request-Id",
+                        "REQ-SEC-002"
+                )
+        );
+        }
+
 }

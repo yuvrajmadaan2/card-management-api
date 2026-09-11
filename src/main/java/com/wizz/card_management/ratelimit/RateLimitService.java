@@ -3,6 +3,8 @@ package com.wizz.card_management.ratelimit;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class RateLimitService {
@@ -13,6 +15,9 @@ public class RateLimitService {
     private final ConcurrentHashMap<String, RateLimitEntry> clients =
             new ConcurrentHashMap<>();
 
+
+    private static final Logger log =
+            LoggerFactory.getLogger(RateLimitService.class);
     public boolean isAllowed(String partnerId) {
 
         long now = System.currentTimeMillis();
@@ -32,7 +37,13 @@ public class RateLimitService {
                 }
         );
 
-        return entry.requestCount <= MAX_REQUESTS;
+        boolean allowed = entry.requestCount <= MAX_REQUESTS;
+
+        if (!allowed) {
+            log.warn("Rate limit exceeded for partnerId={}", partnerId);
+        }
+
+        return allowed;
     }
 
     private static class RateLimitEntry {

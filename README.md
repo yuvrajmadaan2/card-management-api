@@ -86,26 +86,27 @@ For card creation:
 
 # 2. Authentication and Authorization
 
-The application uses Spring Security OAuth2 Resource Server with JWT authentication.
+The APIs are protected using OAuth2 Resource Server with JWT authentication.
 
-The JWT `sub` claim is treated as the partner ID.
+Authorization scopes are read from the standard JWT `scope` claim and mapped by Spring Security to authorities with the `SCOPE_` prefix.
 
-Example JWT:
+For example:
 
 ```json
 {
-  "sub": "partner-001",
-  "groups": [
-    "cards:write"
-  ]
+  "scope": "cards:read cards:write"
 }
 ```
 
-JWT authorities are mapped from the `groups` claim using the application's `SCOPE_` authority convention.
+is mapped to:
 
-Authentication and authorization are enforced before business processing.
+```text
+SCOPE_cards:read
+SCOPE_cards:write
+```
 
-Partner identity is also used for partner-level rate limiting.
+The API endpoints then enforce the required authorities using Spring Security.
+
 
 ---
 
@@ -1009,3 +1010,9 @@ An API is considered complete when:
 - Keep controllers free of repository/business logic.
 - Reuse existing repositories and add only necessary queries.
 - Keep API contracts aligned with the internship specification.
+
+## Development Notes
+
+- Card number generation currently uses a demo/test BIN and is not production card issuance logic.
+- Card expiry is currently a fixed demo value.
+- Production card issuance and expiry data should be replaced with the M2P processor integration.
