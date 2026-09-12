@@ -1,0 +1,2 @@
+ALTER TABLE idempotency_records
+ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'COMPLETED';

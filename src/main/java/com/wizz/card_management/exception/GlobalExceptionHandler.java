@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import jakarta.persistence.OptimisticLockException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -147,6 +148,38 @@ public class GlobalExceptionHandler {
 
         return builder.body(response);
     }
+
+        @ExceptionHandler(OptimisticLockException.class)
+        public ResponseEntity<ErrorResponse> handleOptimisticLockException(
+                OptimisticLockException exception,
+                HttpServletRequest request) {
+
+        String requestId =
+                request.getHeader("X-Request-Id");
+
+        log.warn(
+                "Optimistic locking conflict requestId={}",
+                requestId
+        );
+
+        ErrorResponse response =
+                new ErrorResponse(
+                        requestId,
+                        "409",
+                        "Card has been modified by another request"
+                );
+
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.status(
+                        HttpStatus.CONFLICT
+                );
+
+        if (requestId != null && !requestId.isBlank()) {
+                builder.header("X-Request-Id", requestId);
+        }
+
+        return builder.body(response);
+        }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleInternalException(

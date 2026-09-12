@@ -66,17 +66,21 @@ public class CardStatusUpdateServiceImpl
         String reasonCode =
                 request.getCard().getReasonCode();
 
+        Long requestedVersion =
+                request.getCard().getVersion();
+
         /*
          * Validate status code.
          */
         if (!VALID_STATUS_CODES.contains(requestedStatus)) {
 
-                log.warn(
-                        "Invalid card status requestId={} cardId={} requestedStatus={}",
-                        requestId,
-                        cardId,
-                        requestedStatus
-                );
+            log.warn(
+                    "Invalid card status requestId={} cardId={} requestedStatus={}",
+                    requestId,
+                    cardId,
+                    requestedStatus
+            );
+
             response.setResponseCode("01");
             response.setResponseDesc(
                     "Invalid card status code"
@@ -91,12 +95,14 @@ public class CardStatusUpdateServiceImpl
         if (requiresReasonCode(requestedStatus)
                 && (reasonCode == null
                 || reasonCode.isBlank())) {
-                log.warn(
-                        "Missing reason code requestId={} cardId={} requestedStatus={}",
-                        requestId,
-                        cardId,
-                        requestedStatus
-                );
+
+            log.warn(
+                    "Missing reason code requestId={} cardId={} requestedStatus={}",
+                    requestId,
+                    cardId,
+                    requestedStatus
+            );
+
             response.setResponseCode("02");
             response.setResponseDesc(
                     "Reason code is mandatory for the requested card status"
@@ -106,10 +112,16 @@ public class CardStatusUpdateServiceImpl
         }
 
         /*
-         * Find card.
+         * Find card using the authenticated partner.
+         *
+         * This prevents one partner from updating
+         * another partner's card.
          */
         Optional<Card> cardOptional =
-                cardRepository.findByCardId(cardId);
+                cardRepository.findByCardIdAndPartnerId(
+                        cardId,
+                        partnerId
+                );
 
         if (cardOptional.isEmpty()) {
 
@@ -129,6 +141,30 @@ public class CardStatusUpdateServiceImpl
 
         Card card = cardOptional.get();
 
+        /*
+         * Optimistic locking check.
+         *
+         * The client must send the version it read.
+         * If the card has changed since then, reject the update.
+         */
+        if (!requestedVersion.equals(card.getVersion())) {
+
+            log.warn(
+                    "Card version conflict requestId={} cardId={} expectedVersion={} actualVersion={}",
+                    requestId,
+                    cardId,
+                    requestedVersion,
+                    card.getVersion()
+            );
+
+            response.setResponseCode("409");
+            response.setResponseDesc(
+                    "Card has been modified by another request"
+            );
+
+            return response;
+        }
+
         String currentStatus =
                 card.getCardStatus();
 
@@ -145,7 +181,11 @@ public class CardStatusUpdateServiceImpl
                     )
             );
 
-            populateCardDetails(response, card);
+            populateCardDetails(
+                    response,
+                    card,
+                    partnerId
+            );
 
             return response;
         }
@@ -159,13 +199,15 @@ public class CardStatusUpdateServiceImpl
          * here without inventing undocumented transitions.
          */
         if (isTerminalStatus(currentStatus)) {
-                log.warn(
-                        "Invalid card status transition requestId={} cardId={} currentStatus={} requestedStatus={}",
-                        requestId,
-                        cardId,
-                        currentStatus,
-                        requestedStatus
-                );
+
+            log.warn(
+                    "Invalid card status transition requestId={} cardId={} currentStatus={} requestedStatus={}",
+                    requestId,
+                    cardId,
+                    currentStatus,
+                    requestedStatus
+            );
+
             response.setResponseCode("31");
             response.setResponseDesc(
                     "Invalid card status transition"
@@ -176,6 +218,15 @@ public class CardStatusUpdateServiceImpl
 
         /*
          * Update status.
+         *
+         * @Version on Card makes the database update equivalent to:
+         *
+         * UPDATE cards
+         * SET card_status = ?, version = version + 1
+         * WHERE id = ? AND version = ?
+         *
+         * If another transaction has already updated the card,
+         * Hibernate will detect the optimistic-lock conflict.
          */
         card.setCardStatus(requestedStatus);
 
@@ -189,7 +240,11 @@ public class CardStatusUpdateServiceImpl
                 requestedStatus
         );
 
-        populateCardDetails(response, card);
+        populateCardDetails(
+                response,
+                card,
+                partnerId
+        );
 
         response.setResponseCode("00");
         response.setResponseDesc(
@@ -224,7 +279,8 @@ public class CardStatusUpdateServiceImpl
 
     private void populateCardDetails(
             SetCardStatusResponse response,
-            Card card) {
+            Card card,
+            String partnerId) {
 
         response.setCardNumber(
                 card.getCardNumber()
@@ -235,8 +291,9 @@ public class CardStatusUpdateServiceImpl
         );
 
         Optional<CardProgram> programOptional =
-                cardProgramRepository.findByProgramId(
-                        card.getCardProgramId()
+                cardProgramRepository.findByProgramIdAndPartnerId(
+                        card.getCardProgramId(),
+                        partnerId
                 );
 
         programOptional.ifPresent(program ->

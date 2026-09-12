@@ -76,6 +76,7 @@ class CardStatusControllerTest {
                   "card": {
                     "cardId": "CARD001",
                     "statusCode": "S",
+                    "version": 0,
                     "reasonCode": "CUSTREQ",
                     "remarks": "Temporary travel freeze"
                   }
@@ -190,6 +191,7 @@ class CardStatusControllerTest {
                   "card": {
                     "cardId": "CARD001",
                     "statusCode": "B",
+                    "version": 0,
                     "remarks": "Block card"
                   }
                 }
@@ -261,6 +263,7 @@ class CardStatusControllerTest {
                   "card": {
                     "cardId": "CARD001",
                     "statusCode": "X",
+                    "version": 0,
                     "reasonCode": "TEST"
                   }
                 }
@@ -363,7 +366,8 @@ class CardStatusControllerTest {
                 {
                   "card": {
                     "cardId": "",
-                    "statusCode": ""
+                    "statusCode": "",
+                    "version": 0
                   }
                 }
                 """;

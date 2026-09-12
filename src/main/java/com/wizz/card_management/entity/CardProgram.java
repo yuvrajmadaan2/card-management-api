@@ -13,6 +13,9 @@ public class CardProgram {
     @Column(unique = true, nullable = false)
     private String programId;
 
+    @Column(name = "partner_id", nullable = false, updatable = false)
+    private String partnerId;
+
     @Column(nullable = false)
     private String programName;
 
@@ -28,6 +31,14 @@ public class CardProgram {
 
     public String getProgramId() {
         return programId;
+    }
+
+    public String getPartnerId() {
+        return partnerId;
+    }
+
+    public void setPartnerId(String partnerId) {
+        this.partnerId = partnerId;
     }
 
     public void setProgramId(String programId) {

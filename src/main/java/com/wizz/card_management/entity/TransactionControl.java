@@ -32,6 +32,10 @@ public class TransactionControl {
     @Column(nullable = false)
     private boolean editable;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     public Long getId() {
         return id;
     }
@@ -66,5 +70,13 @@ public class TransactionControl {
 
     public void setEditable(boolean editable) {
         this.editable = editable;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

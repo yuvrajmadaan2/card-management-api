@@ -72,10 +72,10 @@ class CardDetailsReadServiceImplTest {
                         "0012342"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-forex-uk"))
                 .thenReturn(Optional.of(card));
 
-        when(cardProgramRepository.findByProgramId("PRGM001"))
+        when(cardProgramRepository.findByProgramIdAndPartnerId("PRGM001", "partner-forex-uk"))
                 .thenReturn(Optional.of(cardProgram));
 
         CardDetailsResponse response =
@@ -174,12 +174,12 @@ class CardDetailsReadServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-forex-uk");
 
         verify(
                 cardProgramRepository,
                 times(1)
-        ).findByProgramId("PRGM001");
+        ).findByProgramIdAndPartnerId("PRGM001", "partner-forex-uk");
     }
 
     @Test
@@ -191,7 +191,7 @@ class CardDetailsReadServiceImplTest {
                         "0012342"
                 );
 
-        when(cardRepository.findByCardId("UNKNOWN"))
+        when(cardRepository.findByCardIdAndPartnerId("UNKNOWN", "partner-forex-uk"))
                 .thenReturn(Optional.empty());
 
         CardDetailsResponse response =
@@ -226,7 +226,7 @@ class CardDetailsReadServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("UNKNOWN");
+        ).findByCardIdAndPartnerId("UNKNOWN", "partner-forex-uk");
 
         verifyNoInteractions(
                 cardProgramRepository
@@ -243,10 +243,10 @@ class CardDetailsReadServiceImplTest {
                         "0012342"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-forex-uk"))
                 .thenReturn(Optional.of(card));
 
-        when(cardProgramRepository.findByProgramId("PRGM001"))
+        when(cardProgramRepository.findByProgramIdAndPartnerId("PRGM001", "partner-forex-uk"))
                 .thenReturn(Optional.of(cardProgram));
 
         CardDetailsResponse response =
@@ -277,7 +277,7 @@ class CardDetailsReadServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-forex-uk");
     }
 
     @Test
@@ -290,13 +290,13 @@ class CardDetailsReadServiceImplTest {
                         "0012342"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-forex-uk"))
                 .thenReturn(Optional.of(card));
 
-        when(cardRepository.findByCardId("UNKNOWN"))
+        when(cardRepository.findByCardIdAndPartnerId("UNKNOWN", "partner-forex-uk"))
                 .thenReturn(Optional.empty());
 
-        when(cardProgramRepository.findByProgramId("PRGM001"))
+        when(cardProgramRepository.findByProgramIdAndPartnerId("PRGM001", "partner-forex-uk"))
                 .thenReturn(Optional.of(cardProgram));
 
         CardDetailsResponse response =
@@ -327,12 +327,12 @@ class CardDetailsReadServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-forex-uk");
 
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("UNKNOWN");
+        ).findByCardIdAndPartnerId("UNKNOWN", "partner-forex-uk");
     }
 
     @Test
@@ -344,7 +344,7 @@ class CardDetailsReadServiceImplTest {
                         "9999999"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-forex-uk"))
                 .thenReturn(Optional.of(card));
 
         CardDetailsResponse response =
@@ -379,7 +379,7 @@ class CardDetailsReadServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-forex-uk");
 
         verifyNoInteractions(
                 cardProgramRepository
@@ -392,10 +392,10 @@ class CardDetailsReadServiceImplTest {
         CardDetailsRequest request =
                 createRequest("CARD001");
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-forex-uk"))
                 .thenReturn(Optional.of(card));
 
-        when(cardProgramRepository.findByProgramId("PRGM001"))
+        when(cardProgramRepository.findByProgramIdAndPartnerId("PRGM001", "partner-forex-uk"))
                 .thenReturn(Optional.of(cardProgram));
 
         CardDetailsResponse response =
@@ -433,7 +433,7 @@ class CardDetailsReadServiceImplTest {
                         "0012342"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-forex-uk"))
                 .thenThrow(
                         new RuntimeException(
                                 "Database unavailable"
@@ -459,7 +459,7 @@ class CardDetailsReadServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-forex-uk");
 
         verifyNoInteractions(
                 cardProgramRepository

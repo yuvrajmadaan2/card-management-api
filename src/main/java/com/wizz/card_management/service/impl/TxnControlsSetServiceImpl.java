@@ -83,18 +83,22 @@ public class TxnControlsSetServiceImpl
         Boolean requestedAllowed =
                 request.getChannel().getAllowed();
 
-        // Validate channel type
+        Long requestedVersion =
+                request.getVersion();
+
+        /*
+         * Validate channel type.
+         */
         if (!VALID_CHANNEL_TYPES.contains(channelType)) {
 
-                log.warn(
-                        "Invalid transaction channel type requestId={} cardId={} channelType={}",
-                        requestId,
-                        cardId,
-                        channelType
-                );
+            log.warn(
+                    "Invalid transaction channel type requestId={} cardId={} channelType={}",
+                    requestId,
+                    cardId,
+                    channelType
+            );
 
             response.setResponseCode("01");
-
             response.setResponseDesc(
                     "Invalid transaction channel type"
             );
@@ -102,18 +106,19 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        // DOM is not editable
+        /*
+         * DOM is not editable.
+         */
         if ("DOM".equals(channelType)) {
 
-                log.warn(
-                        "Transaction channel not editable requestId={} cardId={} channelType={}",
-                        requestId,
-                        cardId,
-                        channelType
-                );
+            log.warn(
+                    "Transaction channel not editable requestId={} cardId={} channelType={}",
+                    requestId,
+                    cardId,
+                    channelType
+            );
 
             response.setResponseCode("60");
-
             response.setResponseDesc(
                     "Control locked by program policy — change not permitted"
             );
@@ -121,10 +126,14 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        // Find card
+        /*
+         * Find card using authenticated partner.
+         */
         Card card =
-                cardRepository.findByCardId(cardId)
-                        .orElse(null);
+                cardRepository.findByCardIdAndPartnerId(
+                        cardId,
+                        partnerId
+                ).orElse(null);
 
         if (card == null) {
 
@@ -135,7 +144,6 @@ public class TxnControlsSetServiceImpl
             );
 
             response.setResponseCode("10");
-
             response.setResponseDesc(
                     "Card not found"
             );
@@ -143,7 +151,9 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        // Ownership check
+        /*
+         * Ownership check.
+         */
         String requestedCustomerId =
                 request.getCustomerId();
 
@@ -160,7 +170,6 @@ public class TxnControlsSetServiceImpl
             );
 
             response.setResponseCode("90");
-
             response.setResponseDesc(
                     "Customer-card ownership mismatch"
             );
@@ -168,21 +177,23 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        // Blocked, replaced and inactive cards cannot
-        // have transaction controls changed.
+        /*
+         * Blocked, replaced and inactive cards cannot
+         * have transaction controls changed.
+         */
         if ("B".equals(card.getCardStatus())
                 || "R".equals(card.getCardStatus())
                 || "I".equals(card.getCardStatus())) {
 
-                log.warn(
-                        "Transaction control update declined due to card status " +
-                        "requestId={} cardId={} cardStatus={}",
-                        requestId,
-                        cardId,
-                        card.getCardStatus()
-                );
-            response.setResponseCode("31");
+            log.warn(
+                    "Transaction control update declined due to card status " +
+                    "requestId={} cardId={} cardStatus={}",
+                    requestId,
+                    cardId,
+                    card.getCardStatus()
+            );
 
+            response.setResponseCode("31");
             response.setResponseDesc(
                     "Transaction controls cannot be updated for the current card status"
             );
@@ -199,35 +210,87 @@ public class TxnControlsSetServiceImpl
                                 channelType
                         )
                         .orElse(null);
-        // If no persisted control exists, create one
+
+        /*
+         * If no persisted control exists, create one.
+         *
+         * For a first-time control, the expected version
+         * must be 0 because the entity is newly created.
+         */
         if (control == null) {
 
             controlExists = false;
 
+            if (requestedVersion != 0L) {
+
+                log.warn(
+                        "Transaction control version conflict for new control " +
+                        "requestId={} cardId={} channelType={} expectedVersion={}",
+                        requestId,
+                        cardId,
+                        channelType,
+                        requestedVersion
+                );
+
+                response.setResponseCode("409");
+                response.setResponseDesc(
+                        "Transaction control has been modified by another request"
+                );
+
+                return response;
+            }
+
             control = new TransactionControl();
 
             control.setCardId(cardId);
-
             control.setChannelType(channelType);
-
             control.setEditable(true);
-
             control.setAllowed(false);
         }
 
-        // Protect non-editable controls
+        /*
+         * Optimistic locking check.
+         *
+         * The client sends the version it read.
+         * If the persisted control has a different version,
+         * another request has already modified it.
+         */
+        if (controlExists
+                && !requestedVersion.equals(control.getVersion())) {
+
+            log.warn(
+                    "Transaction control version conflict " +
+                    "requestId={} cardId={} channelType={} " +
+                    "expectedVersion={} actualVersion={}",
+                    requestId,
+                    cardId,
+                    channelType,
+                    requestedVersion,
+                    control.getVersion()
+            );
+
+            response.setResponseCode("409");
+            response.setResponseDesc(
+                    "Transaction control has been modified by another request"
+            );
+
+            return response;
+        }
+
+        /*
+         * Protect non-editable controls.
+         */
         if (!control.isEditable()) {
 
-                log.warn(
-                        "Transaction control update declined because control is not editable " +
-                        "requestId={} cardId={} channelType={}",
-                        requestId,
-                        cardId,
-                        channelType
-                );
+            log.warn(
+                    "Transaction control update declined because control is not editable " +
+                    "requestId={} cardId={} channelType={}",
+                    requestId,
+                    cardId,
+                    channelType
+            );
 
             response.setResponseCode("60");
-
             response.setResponseDesc(
                     "Control locked by program policy — change not permitted"
             );
@@ -252,8 +315,11 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        // No-op: requested value is already the current value
-        if (controlExists && control.isAllowed() == requestedAllowed) {
+        /*
+         * No-op: requested value is already the current value.
+         */
+        if (controlExists
+                && control.isAllowed() == requestedAllowed) {
 
             TxnControlsSetResponse.Channel responseChannel =
                     new TxnControlsSetResponse.Channel();
@@ -273,7 +339,6 @@ public class TxnControlsSetServiceImpl
             response.setChannel(responseChannel);
 
             response.setResponseCode("00");
-
             response.setResponseDesc(
                     "Transaction control already has the requested value"
             );
@@ -281,7 +346,13 @@ public class TxnControlsSetServiceImpl
             return response;
         }
 
-        // Apply requested value
+        /*
+         * Apply requested value.
+         *
+         * @Version on TransactionControl makes Hibernate
+         * protect the actual database update against
+         * concurrent modifications.
+         */
         control.setAllowed(requestedAllowed);
 
         transactionControlRepository.save(control);
@@ -295,7 +366,9 @@ public class TxnControlsSetServiceImpl
                 requestedAllowed
         );
 
-        // Build successful response
+        /*
+         * Build successful response.
+         */
         TxnControlsSetResponse.Channel responseChannel =
                 new TxnControlsSetResponse.Channel();
 
@@ -314,7 +387,6 @@ public class TxnControlsSetServiceImpl
         response.setChannel(responseChannel);
 
         response.setResponseCode("00");
-
         response.setResponseDesc(
                 "Transaction control updated successfully"
         );

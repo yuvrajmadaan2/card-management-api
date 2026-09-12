@@ -9,4 +9,6 @@ public interface CardRepository extends JpaRepository<Card, Long> {
 
     Optional<Card> findByCardId(String cardId);
 
+    Optional<Card> findByCardIdAndPartnerId(String cardId, String partnerId);
+
 }

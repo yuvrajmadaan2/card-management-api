@@ -75,8 +75,11 @@ public class CardDetailsReadServiceImpl
                 continue;
             }
 
-            Optional<Card> cardOptional =
-                    cardRepository.findByCardId(cardId);
+                Optional<Card> cardOptional =
+                        cardRepository.findByCardIdAndPartnerId(
+                                cardId,
+                                partnerId
+                        );
 
             // Card does not exist
             if (cardOptional.isEmpty()) {
@@ -168,10 +171,11 @@ public class CardDetailsReadServiceImpl
                     card.getIssuedDate()
             );
 
-            Optional<CardProgram> programOptional =
-                    cardProgramRepository.findByProgramId(
-                            card.getCardProgramId()
-                    );
+                Optional<CardProgram> programOptional =
+                        cardProgramRepository.findByProgramIdAndPartnerId(
+                                card.getCardProgramId(),
+                                partnerId
+                        );
 
             programOptional.ifPresent(program ->
                     detail.setCardProgramName(

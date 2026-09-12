@@ -75,6 +75,7 @@ class TxnControlsSetControllerTest {
                 {
                   "cardId": "CARD001",
                   "customerId": "CUSTOMER001",
+                  "version": 0,
                   "channel": {
                     "channelType": "ATM",
                     "allowed": true
@@ -199,6 +200,7 @@ class TxnControlsSetControllerTest {
                 {
                   "cardId": "CARD001",
                   "customerId": "CUSTOMER001",
+                  "version": 0,
                   "channel": {
                     "channelType": "INVALID",
                     "allowed": true
@@ -263,6 +265,7 @@ class TxnControlsSetControllerTest {
                 {
                   "cardId": "UNKNOWN",
                   "customerId": "CUSTOMER001",
+                  "version": 0,
                   "channel": {
                     "channelType": "ATM",
                     "allowed": true
@@ -380,6 +383,7 @@ class TxnControlsSetControllerTest {
                 {
                   "cardId": "CARD001",
                   "customerId": "CUSTOMER001",
+                  "version": 0,
                   "channel": {
                     "channelType": "DOM",
                     "allowed": true
@@ -426,6 +430,7 @@ class TxnControlsSetControllerTest {
         String invalidJson = """
                 {
                   "cardId": "",
+                  "version": 0,
                   "channel": {
                     "channelType": "ATM",
                     "allowed": true

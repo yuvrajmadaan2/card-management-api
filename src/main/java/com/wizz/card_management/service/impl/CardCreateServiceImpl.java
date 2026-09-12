@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.Optional;
+
 import java.util.UUID;
 
 @Service
@@ -80,29 +81,48 @@ public class CardCreateServiceImpl implements CardCreateService {
         String requestHash =
                 HashUtil.sha256(requestData);
 
-        // Check existing idempotency key
-        Optional<IdempotencyRecord> existingRecord =
+        // Atomically claim the idempotency key before any side effect
+        int claimResult =
+                idempotencyRecordRepository.tryClaim(
+                        partnerId,
+                        idempotencyKey,
+                        requestHash
+                );
+
+        if (claimResult == 0) {
+        IdempotencyRecord record =
                 idempotencyRecordRepository
-                        .findByIdempotencyKey(idempotencyKey);
+                        .findByPartnerIdAndIdempotencyKey(
+                                partnerId,
+                                idempotencyKey
+                        )
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Idempotency record not found after claim conflict"
+                                )
+                        );
 
-        if (existingRecord.isPresent()) {
-
-            IdempotencyRecord record =
-                    existingRecord.get();
-
-            // Same key + different request = conflict
-            if (!record.getRequestHash().equals(requestHash)) {
+        // Same key + different request = conflict
+        if (!record.getRequestHash().equals(requestHash)) {
                 throw new IdempotencyConflictException();
-            }
+        }
 
-            // Same key + same request = replay
-            return buildResponseFromRecord(record);
+        // Completed request = safe replay
+        if ("COMPLETED".equals(record.getStatus())) {
+                return buildResponseFromRecord(record);
+        }
+
+        // A persisted IN_PROGRESS record should not normally occur
+        // because the claim and card creation are in the same transaction.
+        throw new IllegalStateException(
+                "Request with this idempotency key is already in progress"
+        );
         }
 
         // Validate card program
         CardProgram cardProgram =
                 cardProgramRepository
-                        .findByProgramId(programId)
+                        .findByProgramIdAndPartnerId(programId, partnerId)
                         .orElse(null);
 
         if (cardProgram == null) {
@@ -126,7 +146,8 @@ public class CardCreateServiceImpl implements CardCreateService {
             saveIdempotencyRecord(
                     idempotencyKey,
                     requestHash,
-                    response
+                    response,
+                    partnerId
             );
 
             return response;
@@ -154,7 +175,8 @@ public class CardCreateServiceImpl implements CardCreateService {
             saveIdempotencyRecord(
                     idempotencyKey,
                     requestHash,
-                    response
+                    response,
+                    partnerId
             );
 
             return response;
@@ -182,7 +204,8 @@ public class CardCreateServiceImpl implements CardCreateService {
             saveIdempotencyRecord(
                     idempotencyKey,
                     requestHash,
-                    response
+                    response,
+                    partnerId
             );
 
             return response;
@@ -218,6 +241,7 @@ public class CardCreateServiceImpl implements CardCreateService {
         card.setCardId(cardId);
         card.setCardProgramType(programType);
         card.setCardType(cardType);
+        card.setPartnerId(partnerId);
         card.setCardProgramId(programId);
         card.setCardNumber(maskedCardNumber);
         card.setExpiryDate(expiryDate);
@@ -255,21 +279,31 @@ public class CardCreateServiceImpl implements CardCreateService {
         saveIdempotencyRecord(
                 idempotencyKey,
                 requestHash,
-                response
+                response,
+                partnerId
         );
 
         return response;
     }
 
-    private void saveIdempotencyRecord(
-            String idempotencyKey,
-            String requestHash,
-            CreateCardResponse response) {
+        private void saveIdempotencyRecord(
+                String idempotencyKey,
+                String requestHash,
+                CreateCardResponse response,
+                String partnerId) {
 
         IdempotencyRecord record =
-                new IdempotencyRecord();
+                idempotencyRecordRepository
+                        .findByPartnerIdAndIdempotencyKey(
+                                partnerId,
+                                idempotencyKey
+                        )
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Idempotency record not found"
+                                )
+                        );
 
-        record.setIdempotencyKey(idempotencyKey);
         record.setRequestHash(requestHash);
         record.setCardNumber(response.getCardNumber());
         record.setExpiryDate(response.getExpiryDate());
@@ -277,9 +311,10 @@ public class CardCreateServiceImpl implements CardCreateService {
         record.setReferenceId(response.getReferenceId());
         record.setResponseCode(response.getResponseCode());
         record.setResponseDesc(response.getResponseDesc());
+        record.setStatus("COMPLETED");
 
         idempotencyRecordRepository.save(record);
-    }
+        }
 
     private CreateCardResponse buildResponseFromRecord(
             IdempotencyRecord record) {

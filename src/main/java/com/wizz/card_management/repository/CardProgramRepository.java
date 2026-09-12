@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface CardProgramRepository extends JpaRepository<CardProgram, Long> {
 
     Optional<CardProgram> findByProgramId(String programId);
+
+    Optional<CardProgram> findByProgramIdAndPartnerId(String programId, String partnerId);
 }

@@ -101,8 +101,11 @@ public class CardControlsReadServiceImpl
                 continue;
             }
 
-            Optional<Card> cardOptional =
-                    cardRepository.findByCardId(cardId);
+                Optional<Card> cardOptional =
+                        cardRepository.findByCardIdAndPartnerId(
+                                cardId,
+                                partnerId
+                        );
 
             /*
              * Unknown card:

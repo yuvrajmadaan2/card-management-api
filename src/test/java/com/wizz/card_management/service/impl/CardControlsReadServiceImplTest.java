@@ -83,7 +83,7 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER001"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         TxnControlsFetchResponse response =
@@ -189,7 +189,7 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER001"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         TxnControlsFetchResponse response =
@@ -213,7 +213,7 @@ class CardControlsReadServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-001");
     }
 
     @Test
@@ -228,10 +228,10 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER001"
                 );
 
-        when(cardRepository.findByCardId("UNKNOWN"))
+        when(cardRepository.findByCardIdAndPartnerId("UNKNOWN", "partner-001"))
                 .thenReturn(Optional.empty());
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         TxnControlsFetchResponse response =
@@ -272,7 +272,7 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER001"
                 );
 
-        when(cardRepository.findByCardId("UNKNOWN"))
+        when(cardRepository.findByCardIdAndPartnerId("UNKNOWN", "partner-001"))
                 .thenReturn(Optional.empty());
 
         TxnControlsFetchResponse response =
@@ -309,7 +309,7 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER999"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         TxnControlsFetchResponse response =
@@ -339,7 +339,7 @@ class CardControlsReadServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-001");
     }
 
     @Test
@@ -351,7 +351,7 @@ class CardControlsReadServiceImplTest {
                         null
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         TxnControlsFetchResponse response =
@@ -390,7 +390,7 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER001"
                 );
 
-        when(cardRepository.findByCardId("CARD002"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD002", "partner-001"))
                 .thenReturn(Optional.of(blockedCard));
 
         TxnControlsFetchResponse response =
@@ -443,7 +443,7 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER001"
                 );
 
-        when(cardRepository.findByCardId("CARD003"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD003", "partner-001"))
                 .thenReturn(Optional.of(replacedCard));
 
         TxnControlsFetchResponse response =
@@ -487,7 +487,7 @@ class CardControlsReadServiceImplTest {
                         null
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         TxnControlsFetchResponse response =
@@ -524,7 +524,7 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER001"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenThrow(
                         new RuntimeException(
                                 "Database unavailable"
@@ -573,7 +573,7 @@ class CardControlsReadServiceImplTest {
         savedControl.setAllowed(false);
         savedControl.setEditable(true);
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(card));
 
         when(transactionControlRepository
@@ -642,7 +642,7 @@ class CardControlsReadServiceImplTest {
                         "CUSTOMER001"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         TransactionControl control =

@@ -149,25 +149,25 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/v1/cards/details"
                         )
-                        .authenticated()
+                        .hasAuthority("SCOPE_cards:read")
 
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/v1/cards/setStatus"
                         )
-                        .authenticated()
+                        .hasAuthority("SCOPE_cards:write")
 
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/v1/txnControls"
                         )
-                        .authenticated()
+                        .hasAuthority("SCOPE_cards:read")
 
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/v1/txnControls/set"
                         )
-                        .authenticated()
+                        .hasAuthority("SCOPE_cards:write")
 
                         .anyRequest()
                         .authenticated()

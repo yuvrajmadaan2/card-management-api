@@ -41,6 +41,8 @@ class CardStatusUpdateServiceImplTest {
         card = new Card();
 
         card.setCardId("CARD001");
+        card.setPartnerId("partner-001");
+        card.setVersion(0L);
         card.setCardProgramType("P");
         card.setCardType("V");
         card.setCardProgramId("PRGM001");
@@ -54,6 +56,7 @@ class CardStatusUpdateServiceImplTest {
         cardProgram = new CardProgram();
 
         cardProgram.setProgramId("PRGM001");
+        cardProgram.setPartnerId("partner-001");
         cardProgram.setProgramName(
                 "WizzPlus Multicurrency Prepaid"
         );
@@ -70,10 +73,10 @@ class CardStatusUpdateServiceImplTest {
                         "Temporary travel freeze"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(card));
 
-        when(cardProgramRepository.findByProgramId("PRGM001"))
+        when(cardProgramRepository.findByProgramIdAndPartnerId("PRGM001", "partner-001"))
                 .thenReturn(Optional.of(cardProgram));
 
         SetCardStatusResponse response =
@@ -122,7 +125,7 @@ class CardStatusUpdateServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-001");
 
         verify(
                 cardRepository,
@@ -132,7 +135,7 @@ class CardStatusUpdateServiceImplTest {
         verify(
                 cardProgramRepository,
                 times(1)
-        ).findByProgramId("PRGM001");
+        ).findByProgramIdAndPartnerId("PRGM001", "partner-001");
     }
 
     @Test
@@ -232,7 +235,7 @@ class CardStatusUpdateServiceImplTest {
                         "Temporary travel freeze"
                 );
 
-        when(cardRepository.findByCardId("UNKNOWN"))
+        when(cardRepository.findByCardIdAndPartnerId("UNKNOWN", "partner-001"))
                 .thenReturn(Optional.empty());
 
         SetCardStatusResponse response =
@@ -261,7 +264,7 @@ class CardStatusUpdateServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("UNKNOWN");
+        ).findByCardIdAndPartnerId("UNKNOWN", "partner-001");
 
         verify(
                 cardRepository,
@@ -277,6 +280,7 @@ class CardStatusUpdateServiceImplTest {
     void updateCardStatus_sameStatus_returns00WithoutSaving() {
 
         card.setCardStatus("A");
+        card.setVersion(0L);
 
         SetCardStatusRequest request =
                 createRequest(
@@ -286,7 +290,7 @@ class CardStatusUpdateServiceImplTest {
                         null
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(card));
 
         SetCardStatusResponse response =
@@ -320,7 +324,7 @@ class CardStatusUpdateServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-001");
 
         verify(
                 cardRepository,
@@ -330,13 +334,14 @@ class CardStatusUpdateServiceImplTest {
         verify(
                 cardProgramRepository,
                 times(1)
-        ).findByProgramId("PRGM001");
+        ).findByProgramIdAndPartnerId("PRGM001", "partner-001");
     }
 
     @Test
     void updateCardStatus_replacedCard_returns31() {
 
         card.setCardStatus("R");
+        card.setVersion(0L);
 
         SetCardStatusRequest request =
                 createRequest(
@@ -346,7 +351,7 @@ class CardStatusUpdateServiceImplTest {
                         "Temporary travel freeze"
                 );
 
-        when(cardRepository.findByCardId("CARD001"))
+        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
                 .thenReturn(Optional.of(card));
 
         SetCardStatusResponse response =
@@ -375,7 +380,7 @@ class CardStatusUpdateServiceImplTest {
         verify(
                 cardRepository,
                 times(1)
-        ).findByCardId("CARD001");
+        ).findByCardIdAndPartnerId("CARD001", "partner-001");
 
         verify(
                 cardRepository,
@@ -449,6 +454,11 @@ class CardStatusUpdateServiceImplTest {
                 response.getResponseCode()
         );
 
+        assertEquals(
+                "Reason code is mandatory for the requested card status",
+                response.getResponseDesc()
+        );
+
         verifyNoInteractions(
                 cardRepository
         );
@@ -472,6 +482,10 @@ class CardStatusUpdateServiceImplTest {
 
         card.setCardId(cardId);
         card.setStatusCode(statusCode);
+
+        // Optimistic locking expected version
+        card.setVersion(0L);
+
         card.setReasonCode(reasonCode);
         card.setRemarks(remarks);
 

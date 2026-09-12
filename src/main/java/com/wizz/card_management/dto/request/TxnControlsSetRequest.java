@@ -3,10 +3,7 @@ package com.wizz.card_management.dto.request;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-
-
 
 public class TxnControlsSetRequest {
 
@@ -16,6 +13,9 @@ public class TxnControlsSetRequest {
 
     @Size(max = 20, message = "customerId must not exceed 20 characters")
     private String customerId;
+
+    @NotNull(message = "version is mandatory")
+    private Long version;
 
     @Valid
     @NotNull(message = "channel must not be null")
@@ -35,6 +35,14 @@ public class TxnControlsSetRequest {
 
     public void setCustomerId(String customerId) {
         this.customerId = customerId;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public ControlUpdate getChannel() {

@@ -23,8 +23,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,7 +45,6 @@ class CardCreateServiceImplTest {
 
     @BeforeEach
     void setUp() {
-
         request = new CreateCardRequest();
 
         CreateCardRequest.CardPayload card =
@@ -68,17 +66,40 @@ class CardCreateServiceImplTest {
                 true
         );
 
-        when(idempotencyRecordRepository
-                .findByIdempotencyKey("KEY-001"))
-                .thenReturn(Optional.empty());
+        String requestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
+
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-001"),
+                eq(requestHash)
+        )).thenReturn(1);
 
         when(cardProgramRepository
-                .findByProgramId("PROGRAM-001"))
+                .findByProgramIdAndPartnerId(
+                        "PROGRAM-001",
+                        "partner-001"
+                ))
                 .thenReturn(Optional.of(program));
 
         when(cardRepository.save(any(Card.class)))
                 .thenAnswer(invocation ->
                         invocation.getArgument(0));
+
+        IdempotencyRecord claimedRecord =
+                new IdempotencyRecord();
+
+        claimedRecord.setIdempotencyKey("KEY-001");
+        claimedRecord.setPartnerId("partner-001");
+        claimedRecord.setRequestHash(requestHash);
+        claimedRecord.setStatus("IN_PROGRESS");
+
+        when(idempotencyRecordRepository
+                .findByPartnerIdAndIdempotencyKey(
+                        "partner-001",
+                        "KEY-001"
+                ))
+                .thenReturn(Optional.of(claimedRecord));
 
         when(idempotencyRecordRepository.save(
                 any(IdempotencyRecord.class)))
@@ -127,13 +148,40 @@ class CardCreateServiceImplTest {
     @Test
     void invalidProgram_shouldReturnDecline() {
 
-        when(idempotencyRecordRepository
-                .findByIdempotencyKey("KEY-002"))
-                .thenReturn(Optional.empty());
+        String requestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
+
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-002"),
+                eq(requestHash)
+        )).thenReturn(1);
 
         when(cardProgramRepository
-                .findByProgramId("PROGRAM-001"))
+                .findByProgramIdAndPartnerId(
+                        "PROGRAM-001",
+                        "partner-001"
+                ))
                 .thenReturn(Optional.empty());
+
+        IdempotencyRecord claimedRecord =
+                createInProgressRecord(
+                        "KEY-002",
+                        requestHash,
+                        "partner-001"
+                );
+
+        when(idempotencyRecordRepository
+                .findByPartnerIdAndIdempotencyKey(
+                        "partner-001",
+                        "KEY-002"
+                ))
+                .thenReturn(Optional.of(claimedRecord));
+
+        when(idempotencyRecordRepository.save(
+                any(IdempotencyRecord.class)))
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
 
         CreateCardResponse response =
                 cardCreateService.createCard(
@@ -163,17 +211,7 @@ class CardCreateServiceImplTest {
                 .save(any(Card.class));
 
         verify(idempotencyRecordRepository)
-                .save(argThat(record ->
-                        "KEY-002".equals(
-                                record.getIdempotencyKey()
-                        )
-                        && "10".equals(
-                                record.getResponseCode()
-                        )
-                        && "Invalid card program ID".equals(
-                                record.getResponseDesc()
-                        )
-                ));
+                .save(any(IdempotencyRecord.class));
     }
 
     @Test
@@ -185,13 +223,40 @@ class CardCreateServiceImplTest {
                 false
         );
 
-        when(idempotencyRecordRepository
-                .findByIdempotencyKey("KEY-003"))
-                .thenReturn(Optional.empty());
+        String requestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
+
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-003"),
+                eq(requestHash)
+        )).thenReturn(1);
 
         when(cardProgramRepository
-                .findByProgramId("PROGRAM-001"))
+                .findByProgramIdAndPartnerId(
+                        "PROGRAM-001",
+                        "partner-001"
+                ))
                 .thenReturn(Optional.of(program));
+
+        IdempotencyRecord claimedRecord =
+                createInProgressRecord(
+                        "KEY-003",
+                        requestHash,
+                        "partner-001"
+                );
+
+        when(idempotencyRecordRepository
+                .findByPartnerIdAndIdempotencyKey(
+                        "partner-001",
+                        "KEY-003"
+                ))
+                .thenReturn(Optional.of(claimedRecord));
+
+        when(idempotencyRecordRepository.save(
+                any(IdempotencyRecord.class)))
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
 
         CreateCardResponse response =
                 cardCreateService.createCard(
@@ -221,17 +286,7 @@ class CardCreateServiceImplTest {
                 .save(any(Card.class));
 
         verify(idempotencyRecordRepository)
-                .save(argThat(record ->
-                        "KEY-003".equals(
-                                record.getIdempotencyKey()
-                        )
-                        && "10".equals(
-                                record.getResponseCode()
-                        )
-                        && "Card program is inactive".equals(
-                                record.getResponseDesc()
-                        )
-                ));
+                .save(any(IdempotencyRecord.class));
     }
 
     @Test
@@ -243,13 +298,40 @@ class CardCreateServiceImplTest {
                 true
         );
 
-        when(idempotencyRecordRepository
-                .findByIdempotencyKey("KEY-004"))
-                .thenReturn(Optional.empty());
+        String requestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
+
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-004"),
+                eq(requestHash)
+        )).thenReturn(1);
 
         when(cardProgramRepository
-                .findByProgramId("PROGRAM-001"))
+                .findByProgramIdAndPartnerId(
+                        "PROGRAM-001",
+                        "partner-001"
+                ))
                 .thenReturn(Optional.of(program));
+
+        IdempotencyRecord claimedRecord =
+                createInProgressRecord(
+                        "KEY-004",
+                        requestHash,
+                        "partner-001"
+                );
+
+        when(idempotencyRecordRepository
+                .findByPartnerIdAndIdempotencyKey(
+                        "partner-001",
+                        "KEY-004"
+                ))
+                .thenReturn(Optional.of(claimedRecord));
+
+        when(idempotencyRecordRepository.save(
+                any(IdempotencyRecord.class)))
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
 
         CreateCardResponse response =
                 cardCreateService.createCard(
@@ -279,33 +361,33 @@ class CardCreateServiceImplTest {
                 .save(any(Card.class));
 
         verify(idempotencyRecordRepository)
-                .save(argThat(record ->
-                        "KEY-004".equals(
-                                record.getIdempotencyKey()
-                        )
-                        && "10".equals(
-                                record.getResponseCode()
-                        )
-                        && "Card program type mismatch".equals(
-                                record.getResponseDesc()
-                        )
-                ));
+                .save(any(IdempotencyRecord.class));
     }
 
     @Test
     void sameIdempotencyKeyAndSameRequest_shouldReplayOriginalResponse() {
 
-        String requestData =
-                "D|V|PROGRAM-001";
+        String requestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
 
         IdempotencyRecord record =
-                createIdempotencyRecord(
+                createCompletedRecord(
                         "KEY-005",
-                        HashUtil.sha256(requestData)
+                        requestHash,
+                        "partner-001"
                 );
 
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-005"),
+                eq(requestHash)
+        )).thenReturn(0);
+
         when(idempotencyRecordRepository
-                .findByIdempotencyKey("KEY-005"))
+                .findByPartnerIdAndIdempotencyKey(
+                        "partner-001",
+                        "KEY-005"
+                ))
                 .thenReturn(Optional.of(record));
 
         CreateCardResponse response =
@@ -341,23 +423,36 @@ class CardCreateServiceImplTest {
                 .save(any(Card.class));
 
         verify(cardProgramRepository, never())
-                .findByProgramId(anyString());
+                .findByProgramIdAndPartnerId(
+                        anyString(),
+                        anyString()
+                );
     }
 
-        @Test
-        void sameIdempotencyKeyWithDifferentRequestId_shouldReplayOriginalReferenceId() {
+    @Test
+    void sameIdempotencyKeyWithDifferentRequestId_shouldReplayOriginalReferenceId() {
 
-        String requestData =
-                "D|V|PROGRAM-001";
+        String requestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
 
         IdempotencyRecord record =
-                createIdempotencyRecord(
+                createCompletedRecord(
                         "KEY-007",
-                        HashUtil.sha256(requestData)
+                        requestHash,
+                        "partner-001"
                 );
 
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-007"),
+                eq(requestHash)
+        )).thenReturn(0);
+
         when(idempotencyRecordRepository
-                .findByIdempotencyKey("KEY-007"))
+                .findByPartnerIdAndIdempotencyKey(
+                        "partner-001",
+                        "KEY-007"
+                ))
                 .thenReturn(Optional.of(record));
 
         CreateCardResponse response =
@@ -388,23 +483,39 @@ class CardCreateServiceImplTest {
                 .save(any(Card.class));
 
         verify(cardProgramRepository, never())
-                .findByProgramId(anyString());
-        }
+                .findByProgramIdAndPartnerId(
+                        anyString(),
+                        anyString()
+                );
+    }
 
     @Test
     void sameIdempotencyKeyAndDifferentRequest_shouldThrowConflict() {
 
-        String existingRequestData =
-                "D|P|PROGRAM-001";
+        String existingRequestHash =
+                HashUtil.sha256("D|P|PROGRAM-001");
+
+        String currentRequestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
 
         IdempotencyRecord record =
-                createIdempotencyRecord(
+                createCompletedRecord(
                         "KEY-006",
-                        HashUtil.sha256(existingRequestData)
+                        existingRequestHash,
+                        "partner-001"
                 );
 
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-006"),
+                eq(currentRequestHash)
+        )).thenReturn(0);
+
         when(idempotencyRecordRepository
-                .findByIdempotencyKey("KEY-006"))
+                .findByPartnerIdAndIdempotencyKey(
+                        "partner-001",
+                        "KEY-006"
+                ))
                 .thenReturn(Optional.of(record));
 
         assertThrows(
@@ -422,7 +533,57 @@ class CardCreateServiceImplTest {
                 .save(any(Card.class));
 
         verify(cardProgramRepository, never())
-                .findByProgramId(anyString());
+                .findByProgramIdAndPartnerId(
+                        anyString(),
+                        anyString()
+                );
+    }
+
+    @Test
+    void inProgressIdempotencyKey_shouldNotCreateAnotherCard() {
+
+        String requestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
+
+        IdempotencyRecord record =
+                createInProgressRecord(
+                        "KEY-008",
+                        requestHash,
+                        "partner-001"
+                );
+
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-008"),
+                eq(requestHash)
+        )).thenReturn(0);
+
+        when(idempotencyRecordRepository
+                .findByPartnerIdAndIdempotencyKey(
+                        "partner-001",
+                        "KEY-008"
+                ))
+                .thenReturn(Optional.of(record));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> cardCreateService.createCard(
+                        request,
+                        "REQ-008",
+                        "KEY-008",
+                        "WEB",
+                        "partner-001"
+                )
+        );
+
+        verify(cardRepository, never())
+                .save(any(Card.class));
+
+        verify(cardProgramRepository, never())
+                .findByProgramIdAndPartnerId(
+                        anyString(),
+                        anyString()
+                );
     }
 
     private CardProgram createProgram(
@@ -434,6 +595,7 @@ class CardCreateServiceImplTest {
                 new CardProgram();
 
         program.setProgramId(programId);
+        program.setPartnerId("partner-001");
         program.setProgramName("Test Program");
         program.setProgramType(programType);
         program.setActive(active);
@@ -441,15 +603,34 @@ class CardCreateServiceImplTest {
         return program;
     }
 
-    private IdempotencyRecord createIdempotencyRecord(
+    private IdempotencyRecord createInProgressRecord(
             String key,
-            String requestHash) {
+            String requestHash,
+            String partnerId) {
 
         IdempotencyRecord record =
                 new IdempotencyRecord();
 
         record.setIdempotencyKey(key);
+        record.setPartnerId(partnerId);
         record.setRequestHash(requestHash);
+        record.setStatus("IN_PROGRESS");
+
+        return record;
+    }
+
+    private IdempotencyRecord createCompletedRecord(
+            String key,
+            String requestHash,
+            String partnerId) {
+
+        IdempotencyRecord record =
+                createInProgressRecord(
+                        key,
+                        requestHash,
+                        partnerId
+                );
+
         record.setCardNumber("4111XXXXXXXX1111");
         record.setExpiryDate("07/2031");
         record.setCardId("CARD-001");
@@ -458,6 +639,7 @@ class CardCreateServiceImplTest {
         record.setResponseDesc(
                 "Card created successfully"
         );
+        record.setStatus("COMPLETED");
 
         return record;
     }

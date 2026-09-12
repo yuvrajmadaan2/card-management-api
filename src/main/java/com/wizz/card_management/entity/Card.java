@@ -13,6 +13,13 @@ public class Card {
     @Column(unique = true, nullable = false)
     private String cardId;
 
+    @Column(name = "partner_id", nullable = false, updatable = false)
+    private String partnerId;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     private String cardProgramType;
 
     private String cardType;
@@ -47,6 +54,22 @@ public class Card {
 
     public void setCardId(String cardId) {
         this.cardId = cardId;
+    }
+
+    public String getPartnerId() {
+        return partnerId;
+    }
+
+    public void setPartnerId(String partnerId) {
+        this.partnerId = partnerId;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public String getCardProgramType() {
