@@ -17,8 +17,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.util.Optional;
+import com.wizz.card_management.service.CardIssuanceService;
+import com.wizz.card_management.service.IssuanceResult;
 
 import java.util.UUID;
 
@@ -28,22 +29,23 @@ public class CardCreateServiceImpl implements CardCreateService {
     private static final Logger log =
             LoggerFactory.getLogger(CardCreateServiceImpl.class);
 
-    private static final SecureRandom SECURE_RANDOM =
-            new SecureRandom();
+
 
     private final CardRepository cardRepository;
     private final CardProgramRepository cardProgramRepository;
     private final IdempotencyRecordRepository idempotencyRecordRepository;
+    private final CardIssuanceService cardIssuanceService;
 
     public CardCreateServiceImpl(
             CardRepository cardRepository,
             CardProgramRepository cardProgramRepository,
-            IdempotencyRecordRepository idempotencyRecordRepository) {
+            IdempotencyRecordRepository idempotencyRecordRepository,
+            CardIssuanceService cardIssuanceService) {
 
         this.cardRepository = cardRepository;
         this.cardProgramRepository = cardProgramRepository;
-        this.idempotencyRecordRepository =
-                idempotencyRecordRepository;
+        this.idempotencyRecordRepository = idempotencyRecordRepository;
+        this.cardIssuanceService = cardIssuanceService;
     }
 
     @Transactional
@@ -212,28 +214,20 @@ public class CardCreateServiceImpl implements CardCreateService {
         }
 
         // Generate card ID
-        String cardId =
-                UUID.randomUUID().toString();
+        String cardId = UUID.randomUUID().toString();
 
-        // Generate demo card number
-        // TODO: replace with M2P processor call for production card issuance
-        String cardNumber =
-                "411111111111" +
-                String.format(
-                        "%04d",
-                        SECURE_RANDOM.nextInt(10000)
-                );
+        // Issue card through issuance service
+        IssuanceResult issuanceResult =
+                cardIssuanceService.issueCard(request);
 
-        // Mask card number
         String maskedCardNumber =
-                cardNumber.substring(0, 4)
-                        + "XXXXXXXX"
-                        + cardNumber.substring(
-                                cardNumber.length() - 4
-                        );
+                issuanceResult.maskedCardNumber();
 
-        // Generate expiry date
-        String expiryDate = "07/2031";
+        String expiryDate =
+                issuanceResult.expiryDate();
+
+        String processorReference =
+                issuanceResult.processorReference();
 
         // Create Card entity
         Card card = new Card();
@@ -245,6 +239,7 @@ public class CardCreateServiceImpl implements CardCreateService {
         card.setCardProgramId(programId);
         card.setCardNumber(maskedCardNumber);
         card.setExpiryDate(expiryDate);
+        card.setProcessorReference(processorReference);
         card.setCardStatus("A");
 
         // Save card

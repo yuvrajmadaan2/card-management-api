@@ -38,6 +38,9 @@ public class Card {
 
     private String issuedDate;
 
+    @Column(name = "processor_reference", length = 255)
+    private String processorReference;
+
     // Getters and Setters
 
     public Long getId() {
@@ -143,4 +146,13 @@ public class Card {
     public void setIssuedDate(String issuedDate) {
         this.issuedDate = issuedDate;
     }
+
+    public String getProcessorReference() {
+        return processorReference;
+    }
+
+    public void setProcessorReference(String processorReference) {
+        this.processorReference = processorReference;
+    }
+
 }

@@ -20,10 +20,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
-
+import com.wizz.card_management.service.CardIssuanceService;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import com.wizz.card_management.service.IssuanceResult;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +38,9 @@ class CardCreateServiceImplTest {
 
     @Mock
     private IdempotencyRecordRepository idempotencyRecordRepository;
+
+        @Mock
+        private CardIssuanceService cardIssuanceService;
 
     @InjectMocks
     private CardCreateServiceImpl cardCreateService;
@@ -81,6 +85,15 @@ class CardCreateServiceImplTest {
                         "partner-001"
                 ))
                 .thenReturn(Optional.of(program));
+
+        IssuanceResult issuanceResult = new IssuanceResult(
+                "DEV-TEST-123",
+                "4111XXXXXXXX1111",
+                "07/2031"
+        );
+
+        when(cardIssuanceService.issueCard(any(CreateCardRequest.class)))
+                .thenReturn(issuanceResult);
 
         when(cardRepository.save(any(Card.class)))
                 .thenAnswer(invocation ->
@@ -585,6 +598,50 @@ class CardCreateServiceImplTest {
                         anyString()
                 );
     }
+
+        @Test
+        void cardIssuanceFailure_shouldNotSaveCard() {
+
+        String requestHash =
+                HashUtil.sha256("D|V|PROGRAM-001");
+
+        CardProgram program = createProgram(
+                "PROGRAM-001",
+                "D",
+                true
+        );
+
+        when(idempotencyRecordRepository.tryClaim(
+                eq("partner-001"),
+                eq("KEY-009"),
+                eq(requestHash)
+        )).thenReturn(1);
+
+        when(cardProgramRepository.findByProgramIdAndPartnerId(
+                "PROGRAM-001",
+                "partner-001"
+        )).thenReturn(Optional.of(program));
+
+        when(cardIssuanceService.issueCard(
+                any(CreateCardRequest.class)
+        )).thenThrow(
+                new RuntimeException("Issuer unavailable")
+        );
+
+        assertThrows(
+                RuntimeException.class,
+                () -> cardCreateService.createCard(
+                        request,
+                        "REQ-009",
+                        "KEY-009",
+                        "WEB",
+                        "partner-001"
+                )
+        );
+
+        verify(cardRepository, never())
+                .save(any(Card.class));
+        }
 
     private CardProgram createProgram(
             String programId,
