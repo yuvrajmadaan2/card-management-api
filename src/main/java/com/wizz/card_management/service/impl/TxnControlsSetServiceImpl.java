@@ -130,7 +130,7 @@ public class TxnControlsSetServiceImpl
          * Find card using authenticated partner.
          */
         Card card =
-                cardRepository.findByCardIdAndPartnerId(
+                cardRepository.findByCardIdAndPartnerIdForUpdate(
                         cardId,
                         partnerId
                 ).orElse(null);

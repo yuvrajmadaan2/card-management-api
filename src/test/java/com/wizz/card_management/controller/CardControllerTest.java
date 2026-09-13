@@ -474,7 +474,7 @@ class CardControllerTest {
                 )
                 .andExpect(
                         jsonPath("$.responseCode")
-                                .value("09")
+                                .value("99")
                 )
                 .andExpect(
                         jsonPath("$.referenceId")

@@ -56,6 +56,12 @@ public class CardStatusController {
                     responseCode = "403",
                     description = "Forbidden"
             ),
+
+                @ApiResponse(
+                        responseCode = "409",
+                        description = "Card version conflict"
+                ),
+
             @ApiResponse(
                     responseCode = "500",
                     description = "Internal server error"
@@ -100,6 +106,13 @@ public class CardStatusController {
                         channel,
                         partnerId
                 );
+
+        if ("409".equals(response.getResponseCode())) {
+        return ResponseEntity
+                .status(409)
+                .header("X-Request-Id", requestId)
+                .body(response);
+        }
 
         return ResponseEntity
                 .ok()

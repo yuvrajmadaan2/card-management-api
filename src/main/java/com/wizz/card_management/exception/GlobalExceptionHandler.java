@@ -17,7 +17,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -122,19 +122,25 @@ public class GlobalExceptionHandler {
         return builder.body(response);
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicateKey(
-            DataIntegrityViolationException exception,
-            HttpServletRequest request) {
+        @ExceptionHandler(DataIntegrityViolationException.class)
+        public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+                DataIntegrityViolationException exception,
+                HttpServletRequest request) {
 
         String requestId =
                 request.getHeader("X-Request-Id");
 
+        log.warn(
+                "Data integrity violation requestId={}",
+                requestId,
+                exception
+        );
+
         ErrorResponse response =
                 new ErrorResponse(
                         requestId,
-                        "09",
-                        "Idempotency key conflict"
+                        "99",
+                        "Data integrity constraint violation"
                 );
 
         ResponseEntity.BodyBuilder builder =
@@ -143,11 +149,11 @@ public class GlobalExceptionHandler {
                 );
 
         if (requestId != null && !requestId.isBlank()) {
-            builder.header("X-Request-Id", requestId);
+                builder.header("X-Request-Id", requestId);
         }
 
         return builder.body(response);
-    }
+        }
 
         @ExceptionHandler(OptimisticLockException.class)
         public ResponseEntity<ErrorResponse> handleOptimisticLockException(
@@ -173,6 +179,36 @@ public class GlobalExceptionHandler {
                 ResponseEntity.status(
                         HttpStatus.CONFLICT
                 );
+
+        if (requestId != null && !requestId.isBlank()) {
+                builder.header("X-Request-Id", requestId);
+        }
+
+        return builder.body(response);
+        }
+
+        @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+        public ResponseEntity<ErrorResponse> handleObjectOptimisticLockingFailure(
+                ObjectOptimisticLockingFailureException exception,
+                HttpServletRequest request) {
+
+        String requestId =
+                request.getHeader("X-Request-Id");
+
+        log.warn(
+                "Optimistic locking conflict requestId={}",
+                requestId
+        );
+
+        ErrorResponse response =
+                new ErrorResponse(
+                        requestId,
+                        "409",
+                        "Resource has been modified by another request"
+                );
+
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.status(HttpStatus.CONFLICT);
 
         if (requestId != null && !requestId.isBlank()) {
                 builder.header("X-Request-Id", requestId);

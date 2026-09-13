@@ -66,7 +66,7 @@ class TxnControlsSetServiceImplTest {
                         true
                 );
 
-        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         when(transactionControlRepository
@@ -142,7 +142,7 @@ class TxnControlsSetServiceImplTest {
         existingControl.setEditable(true);
         existingControl.setVersion(0L);
 
-        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         when(transactionControlRepository
@@ -263,7 +263,7 @@ class TxnControlsSetServiceImplTest {
                         true
                 );
 
-        when(cardRepository.findByCardIdAndPartnerId("UNKNOWN", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("UNKNOWN", "partner-001"))
                 .thenReturn(Optional.empty());
 
         TxnControlsSetResponse response =
@@ -300,7 +300,7 @@ class TxnControlsSetServiceImplTest {
                         true
                 );
 
-        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         TxnControlsSetResponse response =
@@ -337,7 +337,7 @@ class TxnControlsSetServiceImplTest {
                         true
                 );
 
-        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         when(transactionControlRepository
@@ -380,7 +380,7 @@ class TxnControlsSetServiceImplTest {
                         true
                 );
 
-        when(cardRepository.findByCardIdAndPartnerId("CARD002", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("CARD002", "partner-001"))
                 .thenReturn(Optional.of(blockedCard));
 
         TxnControlsSetResponse response =
@@ -426,7 +426,7 @@ class TxnControlsSetServiceImplTest {
         existingControl.setEditable(false);
         existingControl.setVersion(0L);
 
-        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         when(transactionControlRepository
@@ -482,7 +482,7 @@ class TxnControlsSetServiceImplTest {
         existingControl.setEditable(true);
         existingControl.setVersion(0L);
 
-        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("CARD001", "partner-001"))
                 .thenReturn(Optional.of(activeCard));
 
         when(transactionControlRepository
@@ -542,7 +542,7 @@ class TxnControlsSetServiceImplTest {
                         true
                 );
 
-        when(cardRepository.findByCardIdAndPartnerId("CARD001", "partner-001"))
+        when(cardRepository.findByCardIdAndPartnerIdForUpdate("CARD001", "partner-001"))
                 .thenThrow(
                         new RuntimeException(
                                 "Database unavailable"
